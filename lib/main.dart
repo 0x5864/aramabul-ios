@@ -888,6 +888,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
           'body, * { font-family: "Plus Jakarta Sans", sans-serif !important; }' +
           'body { background: #729875 !important; }' +
           '.global-header-band { display: none !important; }' +
+          '.home-hero-search { display: none !important; }' +
           '.hero { padding-top: 0 !important; }' +
           '.hero-content { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; }' +
           '.istanbul-discovery-shell { background: transparent !important; }' +
