@@ -55,7 +55,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _deleteAccount() async {
-    if (_userEmail.isEmpty) return;
+    // Guest users: prompt to sign in first
+    if (_userEmail.isEmpty || !_isLoggedIn) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text(
+            'Hesap Silme',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          content: const Text(
+            'Hesabınızı silmek için önce giriş yapmanız gerekmektedir.',
+            style: TextStyle(fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Tamam'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -213,13 +235,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
 
-            // Sign out
+            // Account management — always visible per Apple Guideline 5.1.1(v)
+            const SizedBox(height: 20),
+            _buildSectionTitle('Hesap Yönetimi'),
+            const SizedBox(height: 8),
             if (_isLoggedIn) ...[
-              const SizedBox(height: 20),
               _buildSignOutButton(),
               const SizedBox(height: 12),
-              _buildDeleteAccountButton(),
             ],
+            _buildDeleteAccountButton(),
           ],
         ),
       ),

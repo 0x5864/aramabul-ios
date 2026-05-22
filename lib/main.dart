@@ -18,6 +18,8 @@ import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'welcome_screen.dart';
+import 'screens/explore_screen.dart';
+import 'screens/map_explore_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/settings_screen.dart';
 import 'models/venue.dart';
@@ -581,7 +583,8 @@ class _TabShellState extends State<TabShell> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          const HomeWebViewPage(),
+          const ExploreScreen(),
+          const MapExploreScreen(),
           const FavoritesScreen(),
           SettingsScreen(onSignOut: _goToWelcome),
         ],
@@ -605,16 +608,22 @@ class _TabShellState extends State<TabShell> {
                   onTap: () => setState(() => _currentIndex = 0),
                 ),
                 _NavItem(
-                  icon: Icons.favorite_rounded,
-                  label: 'Favoriler',
+                  icon: Icons.map_rounded,
+                  label: 'Harita',
                   isActive: _currentIndex == 1,
                   onTap: () => setState(() => _currentIndex = 1),
                 ),
                 _NavItem(
-                  icon: Icons.person_rounded,
-                  label: 'Profil',
+                  icon: Icons.favorite_rounded,
+                  label: 'Favoriler',
                   isActive: _currentIndex == 2,
                   onTap: () => setState(() => _currentIndex = 2),
+                ),
+                _NavItem(
+                  icon: Icons.person_rounded,
+                  label: 'Profil',
+                  isActive: _currentIndex == 3,
+                  onTap: () => setState(() => _currentIndex = 3),
                 ),
               ],
             ),

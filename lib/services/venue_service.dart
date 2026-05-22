@@ -184,4 +184,39 @@ class VenueService {
       return false;
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Search History (local storage)
+  // ---------------------------------------------------------------------------
+
+  static const String _historyKey = 'aramabul_search_history';
+  static const int _maxHistoryItems = 10;
+
+  static Future<List<String>> getSearchHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_historyKey) ?? [];
+  }
+
+  static Future<void> addSearchHistory(String query) async {
+    final prefs = await SharedPreferences.getInstance();
+    final history = prefs.getStringList(_historyKey) ?? [];
+    history.remove(query); // Remove duplicate
+    history.insert(0, query); // Add to top
+    if (history.length > _maxHistoryItems) {
+      history.removeRange(_maxHistoryItems, history.length);
+    }
+    await prefs.setStringList(_historyKey, history);
+  }
+
+  static Future<void> removeSearchHistoryItem(String item) async {
+    final prefs = await SharedPreferences.getInstance();
+    final history = prefs.getStringList(_historyKey) ?? [];
+    history.remove(item);
+    await prefs.setStringList(_historyKey, history);
+  }
+
+  static Future<void> clearSearchHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_historyKey);
+  }
 }
