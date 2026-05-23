@@ -43,3 +43,46 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# ─── Sensitive / Secret files ───────────────────────────────────────────
+# Environment variables
+.env
+.env.*
+*.env
+.env.local
+.env.development
+.env.staging
+.env.production
+
+# iOS signing & provisioning
+ios/ExportOptions.plist
+*.mobileprovision
+*.p12
+*.cer
+*.pem
+*.p8
+
+# Keystore / signing keys
+*.keystore
+*.jks
+key.properties
+
+# Firebase / Google services
+GoogleService-Info.plist
+google-services.json
+firebase_app_id_file.json
+
+# API keys & secrets
+**/secrets/
+**/credentials/
+*apikey*
+*api_key*
+
+# IPA check artifacts (accidentally committed binary data)
+ipa_check/
+
+# Build outputs
+*.ipa
+*.app
+*.dSYM
+*.xcarchive
