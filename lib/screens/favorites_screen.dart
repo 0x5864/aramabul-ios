@@ -43,7 +43,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('${venue.name} favorilerden kaldırıldı'),
-        backgroundColor: const Color(0xFF425921),
+        backgroundColor: const Color(0xFF2d6b3f),
         action: SnackBarAction(
           label: 'Geri Al',
           textColor: Colors.white,
@@ -92,7 +92,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF729875),
+      backgroundColor: const Color(0xFF45503f),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -181,7 +181,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   Widget _buildFavoritesList() {
     return RefreshIndicator(
-      color: const Color(0xFF425921),
+      color: const Color(0xFF2d6b3f),
       onRefresh: _loadFavorites,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -244,7 +244,7 @@ class _FavoriteCard extends StatelessWidget {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF729875).withValues(alpha: 0.3),
+                      color: const Color(0xFF45503f).withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: venue.imageUrl != null && venue.imageUrl!.isNotEmpty
@@ -257,14 +257,14 @@ class _FavoriteCard extends StatelessWidget {
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => const Icon(
                                 Icons.place_rounded,
-                                color: Color(0xFF425921),
+                                color: Color(0xFF2d6b3f),
                                 size: 28,
                               ),
                             ),
                           )
                         : const Icon(
                             Icons.place_rounded,
-                            color: Color(0xFF425921),
+                            color: Color(0xFF2d6b3f),
                             size: 28,
                           ),
                   ),
@@ -395,20 +395,20 @@ class _QuickAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF425921).withValues(alpha: 0.12),
+          color: const Color(0xFF2d6b3f).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: const Color(0xFF425921)),
+            Icon(icon, size: 16, color: const Color(0xFF2d6b3f)),
             const SizedBox(width: 4),
             Text(
               label,
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF425921),
+                color: Color(0xFF2d6b3f),
               ),
             ),
           ],

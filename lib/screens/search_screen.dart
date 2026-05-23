@@ -129,9 +129,9 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF729875),
+      backgroundColor: const Color(0xFF45503f),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF729875),
+        backgroundColor: const Color(0xFF45503f),
         foregroundColor: Colors.white,
         elevation: 0,
         title: const Text(
@@ -183,11 +183,11 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
             prefixIcon: const Icon(
               Icons.search_rounded,
-              color: Color(0xFF425921),
+              color: Color(0xFF2d6b3f),
             ),
             suffixIcon: _searchController.text.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(Icons.clear_rounded, color: Color(0xFF425921)),
+                    icon: const Icon(Icons.clear_rounded, color: Color(0xFF2d6b3f)),
                     onPressed: () {
                       _searchController.clear();
                       setState(() {
@@ -232,7 +232,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? const Color(0xFF425921)
+                      ? const Color(0xFF2d6b3f)
                       : Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(18),
                   border: isSelected
@@ -462,15 +462,15 @@ class _SearchResultCard extends StatelessWidget {
                         venue.imageUrl!,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFF729875).withValues(alpha: 0.3),
+                          color: const Color(0xFF45503f).withValues(alpha: 0.3),
                           child: const Icon(Icons.place_rounded,
-                              color: Color(0xFF425921), size: 28),
+                              color: Color(0xFF2d6b3f), size: 28),
                         ),
                       )
                     : Container(
-                        color: const Color(0xFF729875).withValues(alpha: 0.3),
+                        color: const Color(0xFF45503f).withValues(alpha: 0.3),
                         child: const Icon(Icons.place_rounded,
-                            color: Color(0xFF425921), size: 28),
+                            color: Color(0xFF2d6b3f), size: 28),
                       ),
               ),
             ),
@@ -533,7 +533,7 @@ class _SearchResultCard extends StatelessWidget {
             ),
             const Icon(
               Icons.chevron_right_rounded,
-              color: Color(0xFF425921),
+              color: Color(0xFF2d6b3f),
               size: 22,
             ),
           ],

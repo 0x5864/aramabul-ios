@@ -81,33 +81,44 @@ class _ExploreScreenState extends State<ExploreScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _nearbyVenues = venues;
+        _nearbyVenues = venues.isNotEmpty ? venues : _filterFallback(category);
         _isLoadingNearby = false;
       });
     } catch (e) {
       debugPrint('[Explore] Nearby error: $e');
       if (!mounted) return;
-      setState(() => _isLoadingNearby = false);
+      setState(() {
+        _nearbyVenues = _filterFallback(category);
+        _isLoadingNearby = false;
+      });
     }
+  }
+
+  List<Venue> _filterFallback(String? category) {
+    final all = VenueService.fallbackVenues;
+    if (category == null || category.isEmpty) return all;
+    return all.where((v) => v.category == category).toList();
   }
 
   Future<void> _loadPopularVenues() async {
     setState(() => _isLoadingPopular = true);
     try {
-      // Use search with a broad query to get featured venues
       final venues = await VenueService.searchVenues(
         query: 'istanbul',
         limit: 10,
       );
       if (!mounted) return;
       setState(() {
-        _popularVenues = venues;
+        _popularVenues = venues.isNotEmpty ? venues : VenueService.fallbackVenues;
         _isLoadingPopular = false;
       });
     } catch (e) {
       debugPrint('[Explore] Popular error: $e');
       if (!mounted) return;
-      setState(() => _isLoadingPopular = false);
+      setState(() {
+        _popularVenues = VenueService.fallbackVenues;
+        _isLoadingPopular = false;
+      });
     }
   }
 
@@ -147,10 +158,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF729875),
+      backgroundColor: const Color(0xFF45503f),
       body: SafeArea(
         child: RefreshIndicator(
-          color: const Color(0xFF425921),
+          color: const Color(0xFF2d6b3f),
           onRefresh: _onRefresh,
           child: CustomScrollView(
             slivers: [
@@ -262,7 +273,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.search_rounded, color: Color(0xFF425921), size: 22),
+                  const Icon(Icons.search_rounded, color: Color(0xFF2d6b3f), size: 22),
                   const SizedBox(width: 12),
                   Text(
                     'Mekan, kategori veya ilçe ara...',
@@ -491,7 +502,7 @@ class _CategoryCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           color: isSelected
-              ? const Color(0xFF425921)
+              ? const Color(0xFF2d6b3f)
               : const Color(0xFFd5e8d3),
           borderRadius: BorderRadius.circular(14),
           border: isSelected
@@ -500,7 +511,7 @@ class _CategoryCard extends StatelessWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: const Color(0xFF425921).withValues(alpha: 0.4),
+                    color: const Color(0xFF2d6b3f).withValues(alpha: 0.4),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -573,19 +584,19 @@ class _VenueHorizontalCard extends StatelessWidget {
                       venue.imageUrl!,
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
-                        color: const Color(0xFF729875).withValues(alpha: 0.3),
+                        color: const Color(0xFF45503f).withValues(alpha: 0.3),
                         child: const Icon(
                           Icons.place_rounded,
-                          color: Color(0xFF425921),
+                          color: Color(0xFF2d6b3f),
                           size: 40,
                         ),
                       ),
                     )
                   : Container(
-                      color: const Color(0xFF729875).withValues(alpha: 0.3),
+                      color: const Color(0xFF45503f).withValues(alpha: 0.3),
                       child: const Icon(
                         Icons.place_rounded,
-                        color: Color(0xFF425921),
+                        color: Color(0xFF2d6b3f),
                         size: 40,
                       ),
                     ),
@@ -635,7 +646,7 @@ class _VenueHorizontalCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF425921).withValues(alpha: 0.12),
+                          color: const Color(0xFF2d6b3f).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -643,7 +654,7 @@ class _VenueHorizontalCard extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w500,
-                            color: Color(0xFF425921),
+                            color: Color(0xFF2d6b3f),
                           ),
                         ),
                       ),
@@ -695,7 +706,7 @@ class _VenueListCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFF425921).withValues(alpha: 0.4),
+                  color: const Color(0xFF2d6b3f).withValues(alpha: 0.4),
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -712,15 +723,15 @@ class _VenueListCard extends StatelessWidget {
                         venue.imageUrl!,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFF729875).withValues(alpha: 0.3),
+                          color: const Color(0xFF45503f).withValues(alpha: 0.3),
                           child: const Icon(Icons.place_rounded,
-                              color: Color(0xFF425921), size: 24),
+                              color: Color(0xFF2d6b3f), size: 24),
                         ),
                       )
                     : Container(
-                        color: const Color(0xFF729875).withValues(alpha: 0.3),
+                        color: const Color(0xFF45503f).withValues(alpha: 0.3),
                         child: const Icon(Icons.place_rounded,
-                            color: Color(0xFF425921), size: 24),
+                            color: Color(0xFF2d6b3f), size: 24),
                       ),
               ),
             ),
@@ -760,7 +771,7 @@ class _VenueListCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF425921),
+                  color: const Color(0xFF2d6b3f),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(

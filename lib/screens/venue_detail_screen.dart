@@ -47,7 +47,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
               ? '${_venue.name} favorilere eklendi'
               : '${_venue.name} favorilerden kaldırıldı',
         ),
-        backgroundColor: const Color(0xFF425921),
+        backgroundColor: const Color(0xFF2d6b3f),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -88,14 +88,14 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF729875),
+      backgroundColor: const Color(0xFF45503f),
       body: CustomScrollView(
         slivers: [
           // Hero app bar with image
           SliverAppBar(
             expandedHeight: 260,
             pinned: true,
-            backgroundColor: const Color(0xFF425921),
+            backgroundColor: const Color(0xFF2d6b3f),
             foregroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
               background: _venue.imageUrl != null && _venue.imageUrl!.isNotEmpty
@@ -106,7 +106,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                           _venue.imageUrl!,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
-                            color: const Color(0xFF425921),
+                            color: const Color(0xFF2d6b3f),
                             child: const Icon(
                               Icons.place_rounded,
                               color: Colors.white38,
@@ -131,7 +131,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                       ],
                     )
                   : Container(
-                      color: const Color(0xFF425921),
+                      color: const Color(0xFF2d6b3f),
                       child: const Icon(
                         Icons.place_rounded,
                         color: Colors.white38,
@@ -183,7 +183,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF425921),
+                          color: const Color(0xFF2d6b3f),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -408,7 +408,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(detail.icon,
-                        size: 20, color: const Color(0xFF425921)),
+                        size: 20, color: const Color(0xFF2d6b3f)),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(

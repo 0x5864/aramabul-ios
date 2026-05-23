@@ -130,7 +130,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(
-        child: CircularProgressIndicator(color: Color(0xFF425921)),
+        child: CircularProgressIndicator(color: Color(0xFF2d6b3f)),
       ),
     );
 
@@ -153,7 +153,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Hesabınız başarıyla silindi.'),
-          backgroundColor: Color(0xFF425921),
+          backgroundColor: Color(0xFF2d6b3f),
         ),
       );
       widget.onSignOut?.call();
@@ -175,7 +175,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF729875),
+      backgroundColor: const Color(0xFF45503f),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
@@ -268,7 +268,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: const Color(0xFF425921),
+                color: const Color(0xFF2d6b3f),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Center(
@@ -373,7 +373,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF425921) : Colors.transparent,
+                    color: isSelected ? const Color(0xFF2d6b3f) : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Center(
@@ -406,7 +406,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       margin: const EdgeInsets.only(bottom: 4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: ListTile(
-        leading: Icon(icon, color: const Color(0xFF425921), size: 22),
+        leading: Icon(icon, color: const Color(0xFF2d6b3f), size: 22),
         title: Text(
           label,
           style: const TextStyle(fontSize: 14, color: Color(0xFF1a1a1a)),
@@ -480,7 +480,7 @@ class _StatCard extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: const Color(0xFF425921), size: 20),
+            Icon(icon, color: const Color(0xFF2d6b3f), size: 20),
             const SizedBox(width: 8),
             Column(
               children: [

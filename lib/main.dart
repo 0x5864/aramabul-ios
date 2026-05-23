@@ -69,8 +69,8 @@ class AramaBulApp extends StatelessWidget {
       title: 'AramaBul',
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF425921)),
-        scaffoldBackgroundColor: const Color(0xFF729875),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2d6b3f)),
+        scaffoldBackgroundColor: const Color(0xFF45503f),
       ),
       home: const AppEntryPoint(),
     );
@@ -136,7 +136,7 @@ class _AppEntryPointState extends State<AppEntryPoint> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Facebook ile giriş yakında aktif olacak.'),
-            backgroundColor: Color(0xFF729875),
+            backgroundColor: Color(0xFF45503f),
           ),
         );
         break;
@@ -355,7 +355,7 @@ class _AppEntryPointState extends State<AppEntryPoint> {
     if (_showWelcome == null) {
       // Loading state
       return const Scaffold(
-        backgroundColor: Color(0xFF729875),
+        backgroundColor: Color(0xFF45503f),
         body: Center(
           child: CircularProgressIndicator(color: Colors.white),
         ),
@@ -426,7 +426,7 @@ class _PolicyViewerPageState extends State<_PolicyViewerPage> {
           widget.title,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         ),
-        backgroundColor: const Color(0xFF729875),
+        backgroundColor: const Color(0xFF45503f),
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -435,7 +435,7 @@ class _PolicyViewerPageState extends State<_PolicyViewerPage> {
           WebViewWidget(controller: _controller),
           if (_isLoading)
             const Center(
-              child: CircularProgressIndicator(color: Color(0xFF425921)),
+              child: CircularProgressIndicator(color: Color(0xFF2d6b3f)),
             ),
         ],
       ),
@@ -539,7 +539,7 @@ class _AuthPageState extends State<_AuthPage> {
           widget.title,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         ),
-        backgroundColor: const Color(0xFF729875),
+        backgroundColor: const Color(0xFF45503f),
         foregroundColor: Colors.white,
         elevation: 0,
       ),
@@ -548,7 +548,7 @@ class _AuthPageState extends State<_AuthPage> {
           WebViewWidget(controller: _controller),
           if (_isLoading)
             const Center(
-              child: CircularProgressIndicator(color: Color(0xFF425921)),
+              child: CircularProgressIndicator(color: Color(0xFF2d6b3f)),
             ),
         ],
       ),
@@ -591,7 +591,7 @@ class _TabShellState extends State<TabShell> {
       ),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          color: Color(0xFF729875),
+          color: Color(0xFF45503f),
           border: Border(top: BorderSide(color: Color(0xFF5a7d5c), width: 0.5)),
         ),
         child: SafeArea(
@@ -895,7 +895,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
         style.textContent = 
           '@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap");' +
           'body, * { font-family: "Plus Jakarta Sans", sans-serif !important; }' +
-          'body { background: #729875 !important; }' +
+          'body { background: #45503f !important; }' +
           '.global-header-band { display: none !important; }' +
           '.home-hero-search { display: none !important; }' +
           '.hero { padding-top: 0 !important; }' +
@@ -903,26 +903,42 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
           '.istanbul-discovery-shell { background: transparent !important; }' +
           '.istanbul-discovery-copy, .istanbul-discovery-hero-card { border: none !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; }' +
           '.istanbul-results-shell { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 8px !important; }' +
-          '.istanbul-filter-card { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; }' +
-          '.istanbul-filter-location-box, .istanbul-filter-section-box { background: #d5e8d3 !important; border: 1px solid #c2d8c0 !important; border-radius: 4px !important; padding: 12px !important; margin-bottom: 8px !important; }' +
+          '.istanbul-filter-card { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; overflow: visible !important; }' +
+          '.istanbul-filter-body, .istanbul-filter-yeme-icme-sidebar, .istanbul-filter-yeme-icme-sidebar--gezi-two-up { overflow: visible !important; }' +
+          '.istanbul-filter-location-box, .istanbul-filter-section-box { background: #e8c37b !important; border: none !important; border-radius: 14px !important; padding: 12px !important; margin-bottom: 8px !important; overflow: visible !important; position: relative !important; }' +
+          '.istanbul-filter-location-box-title, .istanbul-filter-section-box-title, .istanbul-filter-gezi-category-box .istanbul-filter-section-box-title { color: #000000 !important; }' +
+          '.istanbul-filter-location-box { z-index: 200 !important; }' +
+          '.istanbul-filter-section-box { z-index: 100 !important; }' +
+          '.kesfet-category-dropdown-btn, .lang-switch-btn { display: flex !important; align-items: center !important; justify-content: space-between !important; width: 100% !important; background: #ffffff !important; color: #011d36 !important; border: 1px solid rgba(164,179,181,0.82) !important; border-radius: 6px !important; padding: 0.5rem 0.65rem !important; font-size: 0.84rem !important; cursor: pointer !important; box-sizing: border-box !important; }' +
+          '.istanbul-filter-field { display: block !important; margin-bottom: 6px !important; }' +
+          '.istanbul-filter-field > span { display: block !important; margin-bottom: 4px !important; font-size: 0.82rem !important; color: #000000 !important; }' +
+          '.istanbul-filter-location-box .kesfet-category-dropdown, .istanbul-filter-section-box .kesfet-category-dropdown { position: relative !important; z-index: 1200 !important; }' +
+          '.kesfet-category-dropdown-menu { position: absolute !important; left: 0 !important; top: calc(100% + 4px) !important; width: max-content !important; min-width: 100% !important; max-width: calc(100vw - 24px) !important; background: #ffffff !important; border: 1px solid #c2d8c0 !important; border-radius: 6px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important; z-index: 1200 !important; overflow-y: auto !important; max-height: 50vh !important; display: flex !important; flex-direction: column !important; padding: 0 !important; }' +
+          '.kesfet-category-dropdown-menu[hidden] { display: none !important; }' +
+          '.kesfet-category-dropdown.is-open .kesfet-category-dropdown-menu { display: flex !important; }' +
+          '.lang-switch-menu { position: absolute !important; background: #ffffff !important; border: 1px solid #c2d8c0 !important; border-radius: 6px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important; z-index: 1200 !important; overflow-y: auto !important; max-height: 50vh !important; }' +
+          '.lang-switch-menu[hidden] { display: none !important; }' +
           '.featured-venues-section { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding-left: 0 !important; padding-right: 0 !important; padding-bottom: 0 !important; }' +
           '.featured-venues-panel { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; }' +
           '.featured-venues-grid { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; }' +
-          '.content-guide { background: #d5e8d3 !important; border: none !important; box-shadow: none !important; border-radius: 4px !important; padding: 16px !important; margin-top: 12px !important; }' +
+          '.content-guide { background: #d7d7d7 !important; border: none !important; box-shadow: none !important; border-radius: 14px !important; padding: 16px !important; margin-top: 12px !important; }' +
+          '.content-guide.home-ustalara-saygi { background: #e8c37b !important; border-radius: 14px !important; }' +
           '.home-empty-box { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; }' +
           '.home-subcategory-list { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 0.5rem !important; }' +
           '.home-subcat-chip { border-radius: 8px !important; padding: 0.5rem 0.25rem !important; font-size: 0.8rem !important; }' +
           '.content-guide h2, .content-guide h3, .content-guide p, .content-guide li, .content-guide strong { color: #000 !important; }' +
-          '.home-top-category-row { background: transparent !important; }' +
+          '.home-top-category-row { background: transparent !important; display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 0.5rem !important; }' +
           '.istanbul-venue-card { background: #d5e8d3 !important; border-color: #d5e8d3 !important; }' +
           '.istanbul-results-grid { padding: 0 !important; }' +
-          '.home-subcat-chip { background: #d5e8d3 !important; border-color: #c2d8c0 !important; }' +
-          '.top-city-card, .category-home-card { background: #d5e8d3 !important; }' +
-          '.top-city-name { font-size: 0.8rem !important; font-weight: 400 !important; }' +
-          '.istanbul-discovery-hero-label { background: #d5e8d3 !important; }' +
-          '.istanbul-venue-tag { background: #d5e8d3 !important; border-color: #c2d8c0 !important; }' +
-          '.istanbul-filter-nearby-panel-button, .istanbul-discovery-primary-button { background: #425921 !important; border-color: #425921 !important; color: #fff !important; }' +
-          '.venue-detail-main-card, .venue-detail-side-card { background: #d5e8d3 !important; border-color: #c2d8c0 !important; border-radius: 4px !important; }' +
+          '.home-subcat-chip { background: #fdf8f0 !important; border: none !important; border-radius: 8px !important; padding: 0.5rem 0.25rem !important; font-size: 0.76rem !important; font-weight: 600 !important; color: #093826 !important; }' +
+          '.category-home-card .top-city-thumb { display: none !important; }' +
+          '.top-city-card, .category-home-card { background: #71935d !important; border: none !important; border-radius: 8px !important; padding: 0.5rem 0.25rem !important; min-height: auto !important; aspect-ratio: auto !important; color: #fff !important; }' +
+          '.category-home-card .top-city-content { position: static !important; padding: 0 !important; text-align: center !important; }' +
+          '.top-city-name { font-size: 0.8rem !important; font-weight: 400 !important; color: #fff !important; }' +
+          '.istanbul-discovery-hero-label { background: #fdf8f0 !important; border: none !important; border-radius: 8px !important; color: #093826 !important; font-size: 0.76rem !important; font-weight: 600 !important; padding: 0.25rem 0.55rem !important; }' +
+          '.istanbul-venue-tag, .istanbul-venue-distance, .istanbul-venue-budget { background: #fdf8f0 !important; border: none !important; border-radius: 8px !important; color: #093826 !important; font-size: 0.76rem !important; font-weight: 600 !important; padding: 0.25rem 0.55rem !important; white-space: nowrap !important; }' +
+          '.istanbul-filter-nearby-panel-button, .istanbul-discovery-primary-button { background: #71935d !important; border: none !important; border-radius: 14px !important; color: #fff !important; }' +
+          '.venue-detail-main-card, .venue-detail-side-card { background: #ede4d5 !important; border: none !important; border-radius: 14px !important; }' +
           '.venue-detail-media, .venue-detail-info, .venue-detail-reviews, .venue-detail-review-form { background: #d5e8d3 !important; border-color: #d5e8d3 !important; }' +
           '.section-head h1, .section-head h2, .section-head h3, .province-head h1, .province-head h2, .province-head h3, .istanbul-discovery-copy h1, .istanbul-discovery-copy h2 { color: #ffffff !important; font-weight: 700 !important; margin-bottom: 0.75rem !important; }' +
           '.istanbul-discovery-kicker, .istanbul-breadcrumb, .istanbul-breadcrumb a, .istanbul-breadcrumb a:visited, .istanbul-breadcrumb span, .istanbul-discovery-subline, .istanbul-discovery-location-note { color: #ffffff !important; }' +
@@ -943,19 +959,66 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
           '.search-page-shell { background: transparent !important; border: none !important; box-shadow: none !important; }' +
           '.search-page-note { display: none !important; }' +
           '.search-page .hero { padding-top: 3rem !important; }' +
-          '.header-search-btn, .istanbul-discovery-primary-button, .istanbul-filter-nearby-panel-button, .settings-feedback-submit, .settings-signout { background: #425921 !important; border-color: #425921 !important; color: #fff !important; }' +
+          '.header-search-btn, .settings-feedback-submit, .settings-signout { background: #71935d !important; border: none !important; border-radius: 14px !important; color: #fff !important; }' +
           '.store-badge { background: #0f2d1f !important; border-color: #0f2d1f !important; color: #fff !important; }' +
-          '.header-search-btn:hover, .istanbul-discovery-primary-button:hover { background: #354a1a !important; }' +
-          '.istanbul-pagination-button { background: #425921 !important; border-color: #425921 !important; color: #fff !important; }' +
-          '.istanbul-pagination-current { background: #729875 !important; border-color: #729875 !important; color: #fff !important; }' +
+          '.header-search-btn:hover, .istanbul-discovery-primary-button:hover { background: #5f7d4e !important; }' +
+          '.istanbul-pagination-button { background: #71935d !important; border: none !important; border-radius: 14px !important; color: #fff !important; }' +
+          '.istanbul-pagination-current { background: #45503f !important; border-color: #45503f !important; color: #fff !important; }' +
           '.istanbul-results-mode { display: none !important; }' +
-          '.istanbul-venue-distance { background: transparent !important; }' +
-          '.istanbul-venue-distance::before { background-color: transparent !important; }' +
-          '.istanbul-favorite-button { background: #f4f5f5 !important; border: 1px solid #dcdede !important; color: #011d36 !important; border-radius: 4px !important; }' +
+          '.istanbul-favorite-button, .card-share-trigger { background: #fdf8f0 !important; border: none !important; color: #093826 !important; border-radius: 8px !important; font-size: 0.76rem !important; font-weight: 600 !important; padding: 0.25rem 0.55rem !important; }' +
+          '.venue-detail-action, .venue-detail-action-secondary, .venue-detail-action-inline { background: #fdf8f0 !important; border: none !important; color: #093826 !important; border-radius: 8px !important; font-size: 0.76rem !important; font-weight: 600 !important; padding: 0.25rem 0.55rem !important; }' +
+          '.venue-detail-chip { background: #fdf8f0 !important; border: none !important; border-radius: 8px !important; color: #093826 !important; font-size: 0.76rem !important; font-weight: 600 !important; padding: 0.25rem 0.55rem !important; }' +
           '#favoritesTitle { color: #ffffff !important; }' +
-          '.istanbul-results-head h2 { color: #ffffff !important; }';
+          '.istanbul-results-head h2 { color: #ffffff !important; }' +
+          '.kesfet-category-dropdown-options { gap: 0 !important; padding: 0 !important; margin: 0 !important; }' +
+          '.kesfet-category-dropdown-options .istanbul-filter-chip, .kesfet-category-dropdown-options .istanbul-mvp-subcategory-box { border-radius: 0 !important; border: none !important; border-bottom: 1px solid rgba(164,179,181,0.35) !important; background: transparent !important; padding: 0.56rem 0.65rem !important; transition: background 0.15s ease !important; }' +
+          '.kesfet-category-dropdown-options .istanbul-filter-chip:last-child, .kesfet-category-dropdown-options .istanbul-mvp-subcategory-box:last-child { border-bottom: none !important; }' +
+          '.kesfet-category-dropdown-options .istanbul-mvp-subcategory-box.is-active { background: rgba(9,56,38,0.08) !important; color: #093826 !important; font-weight: 500 !important; }';
         document.head.appendChild(style);
       }
+
+      // Force district dropdown button visibility via inline styles
+      // Use retry + MutationObserver because buttons may not exist yet when onPageFinished fires
+      (function fixDropdownButtons() {
+        function applyFix() {
+          var btns = document.querySelectorAll('.kesfet-category-dropdown-btn');
+          if (!btns.length) return false;
+          for (var i = 0; i < btns.length; i++) {
+            var b = btns[i];
+            if (b.dataset.appFixed) continue;
+            b.dataset.appFixed = '1';
+            b.style.setProperty('display', 'flex', 'important');
+            b.style.setProperty('background', '#ffffff', 'important');
+            b.style.setProperty('color', '#011d36', 'important');
+            b.style.setProperty('border', '1px solid rgba(164,179,181,0.82)', 'important');
+            b.style.setProperty('border-radius', '6px', 'important');
+            b.style.setProperty('padding', '0.5rem 0.65rem', 'important');
+            b.style.setProperty('width', '100%', 'important');
+            b.style.setProperty('justify-content', 'space-between', 'important');
+            b.style.setProperty('align-items', 'center', 'important');
+            b.style.setProperty('font-size', '0.84rem', 'important');
+            b.style.setProperty('box-sizing', 'border-box', 'important');
+            b.style.setProperty('cursor', 'pointer', 'important');
+            b.style.setProperty('min-height', '2.1rem', 'important');
+          }
+          return true;
+        }
+        // Try immediately
+        applyFix();
+        // Retry every 300ms for up to 5 seconds
+        var attempts = 0;
+        var timer = setInterval(function() {
+          attempts++;
+          applyFix();
+          if (attempts >= 16) clearInterval(timer);
+        }, 300);
+        // Also use MutationObserver for dynamic elements
+        if (window.MutationObserver) {
+          var obs = new MutationObserver(function() { applyFix(); });
+          obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
+          setTimeout(function() { obs.disconnect(); }, 8000);
+        }
+      })();
 
       // Pagination: scroll to first card when page changes
       var paginationNav = document.getElementById('pagination');
@@ -1027,8 +1090,8 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
         favObs.observe(favTitle, { childList: true, characterData: true, subtree: true });
       }
 
-      // Hide header language switch and apply selected language
-      var langSwitch = document.querySelector('.lang-switch');
+      // Hide header language switch (not the filter dropdowns which also use lang-switch class)
+      var langSwitch = document.querySelector('.global-topbar .lang-switch, .desktop-auth-links .lang-switch, [data-lang-switch]');
       if (langSwitch) { langSwitch.style.display = 'none'; }
 
       // Apply app language to website
@@ -1047,7 +1110,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
       var wm = document.querySelector('.brand-wordmark');
       if (wm && !wm.dataset.colored) {
         wm.dataset.colored = '1';
-        wm.innerHTML = '<span style="color:#093827">arama</span>bul';
+        wm.innerHTML = '<span style=\"color:#e8f0e8\">arama</span><span style=\"color:#a8d5a2\">bul</span>';
       }
 
       // Simplify hero: change h1 + remove description paragraphs
@@ -1060,6 +1123,15 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
         if (container) {
           container.querySelectorAll('p').forEach(function(p) { p.style.display = 'none'; });
         }
+      }
+      // Settings: fix mobile panel visibility for sub-panels (password, feedback, etc.)
+      var params = new URLSearchParams(window.location.search);
+      var action = (params.get('action') || '').trim().toLowerCase();
+      if (action === 'password' || action === 'feedback' || action === 'help' || action === 'about') {
+        var panelStack = document.querySelector('.settings-panel-stack');
+        var sidebar = document.querySelector('.settings-sidebar-card');
+        if (panelStack) { panelStack.style.display = 'block'; }
+        if (sidebar) { sidebar.style.display = 'none'; }
       }
     ''');
   }
@@ -1154,7 +1226,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
     // JS bridge
     _setupJsBridge();
 
-    _controller.setBackgroundColor(const Color(0xFF729875));
+    _controller.setBackgroundColor(const Color(0xFF45503f));
 
     final platformController = _controller.platform;
     if (platformController is WebKitWebViewController) {
@@ -1312,7 +1384,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
 
     // Match status bar to the web header color
     SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Color(0xFF729875),
+      statusBarColor: Color(0xFF45503f),
       statusBarIconBrightness: Brightness.dark,
     ));
 
@@ -1326,12 +1398,12 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
         }
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF729875),
+        backgroundColor: const Color(0xFF45503f),
         body: Column(
           children: [
             // Status bar safe padding with matching color
             Container(
-              color: const Color(0xFF729875),
+              color: const Color(0xFF45503f),
               height: MediaQuery.of(context).padding.top,
             ),
             if (_isOffline)
@@ -1352,8 +1424,8 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
             if (showProgress)
               LinearProgressIndicator(
                 value: _progress / 100,
-                color: const Color(0xFF425921),
-                backgroundColor: const Color(0xFF729875),
+                color: const Color(0xFF2d6b3f),
+                backgroundColor: const Color(0xFF45503f),
               ),
             Expanded(
               child: Stack(
@@ -1366,7 +1438,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
                       child: AnimatedOpacity(
                         opacity: _isPageTransitioning ? 1.0 : 0.0,
                         duration: const Duration(milliseconds: 200),
-                        child: Container(color: const Color(0xFF729875)),
+                        child: Container(color: const Color(0xFF45503f)),
                       ),
                     ),
                 ],
@@ -1375,7 +1447,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
             // AdMob Banner Ad
             if (_isBannerReady && _bannerAd != null)
               Container(
-                color: const Color(0xFF729875),
+                color: const Color(0xFF45503f),
                 width: double.infinity,
                 height: _bannerAd!.size.height.toDouble(),
                 child: AdWidget(ad: _bannerAd!),
@@ -1388,7 +1460,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
 
   Widget _buildErrorOverlay() {
     return Container(
-      color: const Color(0xFF729875),
+      color: const Color(0xFF45503f),
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -1433,7 +1505,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
                     icon: const Icon(Icons.refresh_rounded),
                     label: const Text('Tekrar Dene'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF425921),
+                      backgroundColor: const Color(0xFF2d6b3f),
                       minimumSize: const Size(180, 48),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

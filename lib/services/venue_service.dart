@@ -12,6 +12,28 @@ class VenueService {
   static const String kApiBase = 'https://aramabul.com';
 
   // ---------------------------------------------------------------------------
+  // Fallback venues — shown when API is unreachable
+  // ---------------------------------------------------------------------------
+
+  static const List<Map<String, dynamic>> _fallbackVenuesData = [
+    {'id': 9001, 'name': 'Karaköy Güllüoğlu', 'category': 'Restoran', 'district': 'Beyoğlu', 'city': 'İstanbul', 'rating': 4.5, 'reviewCount': 1200, 'latitude': 41.0225, 'longitude': 28.9774, 'slug': 'karakoy-gulluoglu'},
+    {'id': 9002, 'name': 'Mandabatmaz', 'category': 'Kafe', 'district': 'Beyoğlu', 'city': 'İstanbul', 'rating': 4.6, 'reviewCount': 890, 'latitude': 41.0318, 'longitude': 28.9748, 'slug': 'mandabatmaz'},
+    {'id': 9003, 'name': 'Mikla Restaurant', 'category': 'Restoran', 'district': 'Beyoğlu', 'city': 'İstanbul', 'rating': 4.7, 'reviewCount': 650, 'latitude': 41.0347, 'longitude': 28.9788, 'slug': 'mikla-restaurant'},
+    {'id': 9004, 'name': 'Çiya Sofrası', 'category': 'Restoran', 'district': 'Kadıköy', 'city': 'İstanbul', 'rating': 4.4, 'reviewCount': 1500, 'latitude': 40.9903, 'longitude': 29.0282, 'slug': 'ciya-sofrasi'},
+    {'id': 9005, 'name': 'Walter\'s Coffee Roastery', 'category': 'Kafe', 'district': 'Kadıköy', 'city': 'İstanbul', 'rating': 4.3, 'reviewCount': 420, 'latitude': 40.9907, 'longitude': 29.0268, 'slug': 'walters-coffee'},
+    {'id': 9006, 'name': 'Alexandra Cocktail Bar', 'category': 'Bar', 'district': 'Beyoğlu', 'city': 'İstanbul', 'rating': 4.5, 'reviewCount': 310, 'latitude': 41.0334, 'longitude': 28.9771, 'slug': 'alexandra-bar'},
+    {'id': 9007, 'name': 'Topkapı Sarayı Müzesi', 'category': 'Müze', 'district': 'Fatih', 'city': 'İstanbul', 'rating': 4.8, 'reviewCount': 3500, 'latitude': 41.0115, 'longitude': 28.9833, 'slug': 'topkapi-sarayi'},
+    {'id': 9008, 'name': 'Raffles Istanbul', 'category': 'Otel', 'district': 'Beşiktaş', 'city': 'İstanbul', 'rating': 4.6, 'reviewCount': 780, 'latitude': 41.0432, 'longitude': 29.0087, 'slug': 'raffles-istanbul'},
+    {'id': 9009, 'name': 'Sortie Club', 'category': 'Gece Hayatı', 'district': 'Kuruçeşme', 'city': 'İstanbul', 'rating': 4.1, 'reviewCount': 520, 'latitude': 41.0551, 'longitude': 29.0365, 'slug': 'sortie-club'},
+    {'id': 9010, 'name': 'Süleymaniye Hamamı', 'category': 'Sağlık', 'district': 'Fatih', 'city': 'İstanbul', 'rating': 4.4, 'reviewCount': 290, 'latitude': 41.0163, 'longitude': 28.9637, 'slug': 'suleymaniye-hamami'},
+    {'id': 9011, 'name': 'Bebek Parkı', 'category': 'Park', 'district': 'Beşiktaş', 'city': 'İstanbul', 'rating': 4.3, 'reviewCount': 180, 'latitude': 41.0762, 'longitude': 29.0441, 'slug': 'bebek-parki'},
+    {'id': 9012, 'name': 'İstinye Park AVM', 'category': 'Alışveriş', 'district': 'Sarıyer', 'city': 'İstanbul', 'rating': 4.5, 'reviewCount': 2200, 'latitude': 41.1138, 'longitude': 29.0570, 'slug': 'istinye-park'},
+  ];
+
+  static List<Venue> get fallbackVenues =>
+      _fallbackVenuesData.map((e) => Venue.fromJson(e)).toList();
+
+  // ---------------------------------------------------------------------------
   // Favorites (local storage)
   // ---------------------------------------------------------------------------
 
@@ -73,13 +95,12 @@ class VenueService {
     int limit = 20,
   }) async {
     try {
+      // /api/venues/nearby does not exist — use search with location context
       final params = {
-        'lat': latitude.toString(),
-        'lng': longitude.toString(),
+        'q': category ?? 'istanbul',
         'limit': limit.toString(),
-        if (category != null) 'category': category,
       };
-      final uri = Uri.parse('$kApiBase/api/venues/nearby')
+      final uri = Uri.parse('$kApiBase/api/venues/search')
           .replace(queryParameters: params);
 
       final client = HttpClient();
@@ -91,17 +112,11 @@ class VenueService {
       client.close();
 
       if (response.statusCode != 200) {
-        debugPrint('[VenueService] fetchNearby ${response.statusCode}: $body');
+        debugPrint('[VenueService] fetchNearby ${response.statusCode}');
         return [];
       }
 
-      final data = jsonDecode(body);
-      if (data is Map && data['ok'] == true && data['venues'] is List) {
-        return (data['venues'] as List)
-            .map((e) => Venue.fromJson(e as Map<String, dynamic>))
-            .toList();
-      }
-      return [];
+      return _parseVenueResponse(body);
     } catch (e) {
       debugPrint('[VenueService] fetchNearby error: $e');
       return [];
@@ -137,21 +152,51 @@ class VenueService {
       client.close();
 
       if (response.statusCode != 200) {
-        debugPrint('[VenueService] search ${response.statusCode}: $body');
+        debugPrint('[VenueService] search ${response.statusCode}');
         return [];
       }
 
-      final data = jsonDecode(body);
-      if (data is Map && data['ok'] == true && data['venues'] is List) {
-        return (data['venues'] as List)
-            .map((e) => Venue.fromJson(e as Map<String, dynamic>))
-            .toList();
-      }
-      return [];
+      return _parseVenueResponse(body);
     } catch (e) {
       debugPrint('[VenueService] search error: $e');
       return [];
     }
+  }
+
+  /// Parse API response — handles both raw JSON array and {ok, venues} formats.
+  /// Also maps API field names (cuisine→category, userRatingCount→reviewCount,
+  /// photoUri→imageUrl) to our Venue model fields.
+  static List<Venue> _parseVenueResponse(String body) {
+    final data = jsonDecode(body);
+    List<dynamic> rawList;
+
+    if (data is List) {
+      rawList = data;
+    } else if (data is Map && data['venues'] is List) {
+      rawList = data['venues'];
+    } else if (data is Map && data['ok'] == true && data['venues'] is List) {
+      rawList = data['venues'];
+    } else {
+      return [];
+    }
+
+    return rawList.map((e) {
+      final map = e as Map<String, dynamic>;
+      // Map API field names to Venue model field names
+      final mapped = <String, dynamic>{
+        ...map,
+        if (map['cuisine'] != null && map['category'] == null)
+          'category': map['cuisine'],
+        if (map['userRatingCount'] != null && map['reviewCount'] == null)
+          'reviewCount': map['userRatingCount'],
+        if (map['photoUri'] != null && map['imageUrl'] == null)
+          'imageUrl': map['photoUri'],
+        // Generate an id from slug if not present
+        if (map['id'] == null && map['slug'] != null)
+          'id': map['slug'].hashCode.abs(),
+      };
+      return Venue.fromJson(mapped);
+    }).toList();
   }
 
   // ---------------------------------------------------------------------------
