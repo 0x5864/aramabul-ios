@@ -15,6 +15,7 @@ const Map<String, Map<String, String>> _welcomeStrings = {
     'policy': 'Devam ederek Gizlilik Politikası ve\nKullanım Koşullarını kabul etmiş olursunuz.',
     'privacy': 'Gizlilik Politikası',
     'terms': 'Kullanım Koşulları',
+    'skip': 'Giriş yapmadan keşfet',
   },
   'EN': {
     'hello': 'Hello',
@@ -27,6 +28,7 @@ const Map<String, Map<String, String>> _welcomeStrings = {
     'policy': 'By continuing, you agree to our Privacy Policy\nand Terms of Service.',
     'privacy': 'Privacy Policy',
     'terms': 'Terms of Service',
+    'skip': 'Browse without signing in',
   },
   'DE': {
     'hello': 'Hallo',
@@ -39,6 +41,7 @@ const Map<String, Map<String, String>> _welcomeStrings = {
     'policy': 'Durch Fortfahren akzeptieren Sie unsere\nDatenschutzrichtlinie und Nutzungsbedingungen.',
     'privacy': 'Datenschutzrichtlinie',
     'terms': 'Nutzungsbedingungen',
+    'skip': 'Ohne Anmeldung erkunden',
   },
   'RU': {
     'hello': 'Привет',
@@ -51,6 +54,7 @@ const Map<String, Map<String, String>> _welcomeStrings = {
     'policy': 'Продолжая, вы принимаете Политику\nконфиденциальности и Условия использования.',
     'privacy': 'Политика конфиденциальности',
     'terms': 'Условия использования',
+    'skip': 'Просмотр без входа',
   },
 };
 
@@ -248,6 +252,43 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                         ),
 
                         const SizedBox(height: 24),
+
+                        // --- Skip / Guest button (Apple 5.1.1v) ---
+                        GestureDetector(
+                          onTap: () => widget.onContinue(null),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color(0xFF2d6b3f).withValues(alpha: 0.5),
+                                width: 1.5,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.explore_rounded,
+                                  size: 20,
+                                  color: const Color(0xFF2d6b3f),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _t['skip']!,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF2d6b3f),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
 
                         // --- Register link ---
                         Row(

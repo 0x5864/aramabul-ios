@@ -489,7 +489,7 @@ class _AuthPageState extends State<_AuthPage> {
     await prefs.setBool('welcome_seen', true);
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const HomeWebViewPage()),
+      MaterialPageRoute(builder: (_) => const TabShell()),
       (route) => false,
     );
   }
@@ -947,8 +947,11 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
           'body.mobile-bottom-nav-visible { padding-bottom: 0 !important; }' +
           '.mobile-bottom-nav-btn .mobile-bottom-nav-chip { filter: brightness(10) !important; }' +
           '.mobile-bottom-nav-btn .mobile-bottom-nav-label { color: #ffffff !important; }' +
-          '.mobile-bottom-nav-btn.active .mobile-bottom-nav-chip { filter: brightness(0.3) !important; }' +
-          '.mobile-bottom-nav-btn.active .mobile-bottom-nav-label { color: #3c4b49 !important; }' +
+          '.mobile-bottom-nav-btn.active .mobile-bottom-nav-chip { filter: none !important; }' +
+          '.mobile-bottom-nav-btn.active .mobile-bottom-nav-icon-img { display: block !important; filter: brightness(1.5) !important; }' +
+          '.mobile-bottom-nav-btn.active:not([data-mobile-nav=\"search\"]) .mobile-bottom-nav-icon-svg { display: none !important; }' +
+          '.mobile-bottom-nav-btn.active[data-mobile-nav=\"search\"] .mobile-bottom-nav-icon-svg { color: #a8d5a2 !important; }' +
+          '.mobile-bottom-nav-btn.active .mobile-bottom-nav-label { color: #a8d5a2 !important; }' +
           '.global-footer, .global-footer-band, .footer-band, .yr-footer { background: transparent !important; border: none !important; color: #ffffff !important; }' +
           '.global-footer a, .global-footer-band a, .footer-band a, .yr-footer a { color: #ffffff !important; }' +
           '.yr-footer h4 { color: #ffffff !important; }' +
@@ -973,7 +976,10 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
           '.kesfet-category-dropdown-options { gap: 0 !important; padding: 0 !important; margin: 0 !important; }' +
           '.kesfet-category-dropdown-options .istanbul-filter-chip, .kesfet-category-dropdown-options .istanbul-mvp-subcategory-box { border-radius: 0 !important; border: none !important; border-bottom: 1px solid rgba(164,179,181,0.35) !important; background: transparent !important; padding: 0.56rem 0.65rem !important; transition: background 0.15s ease !important; }' +
           '.kesfet-category-dropdown-options .istanbul-filter-chip:last-child, .kesfet-category-dropdown-options .istanbul-mvp-subcategory-box:last-child { border-bottom: none !important; }' +
-          '.kesfet-category-dropdown-options .istanbul-mvp-subcategory-box.is-active { background: rgba(9,56,38,0.08) !important; color: #093826 !important; font-weight: 500 !important; }';
+          '.kesfet-category-dropdown-options .istanbul-mvp-subcategory-box.is-active { background: rgba(9,56,38,0.08) !important; color: #093826 !important; font-weight: 500 !important; }' +
+          '.istanbul-filter-location-box, .istanbul-filter-section-box { background: #4b3123 !important; box-shadow: 0 3px 8px rgba(75,49,35,0.3) !important; color: #fdf8f0 !important; }' +
+          '.istanbul-filter-location-box-title, .istanbul-filter-section-box-title, .istanbul-filter-field > span:first-child, .istanbul-filter-yeme-icme-budget-nest-label { color: #fdf8f0 !important; }' +
+          '.istanbul-venue-card, .istanbul-venue-card-inner, .istanbul-filter-card, .istanbul-filter-section-box, .istanbul-filter-location-box, .content-guide, .venue-detail-main-card, .venue-detail-side-card, .venue-detail-media, .venue-detail-info, .venue-detail-reviews, .venue-detail-review-form, .top-city-card, .category-home-card, .settings-card, .settings-panel-card, .settings-sidebar-card, .istanbul-map-card, .istanbul-map-frame-wrap, .featured-venues-section, .featured-venues-panel, .featured-venues-grid, .home-lezzet-banner-inner { border: none !important; }';
         document.head.appendChild(style);
       }
 
@@ -1050,29 +1056,30 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
         if (searchBtn && favoritesBtn && (searchBtn.compareDocumentPosition(favoritesBtn) & Node.DOCUMENT_POSITION_PRECEDING)) {
           mobileNav.insertBefore(searchBtn, favoritesBtn);
         }
-        // Replace favorites star icon with fav.png heart
-        if (favoritesBtn && !favoritesBtn.dataset.iconSwapped) {
-          favoritesBtn.dataset.iconSwapped = '1';
-          var chip = favoritesBtn.querySelector('.mobile-bottom-nav-chip');
-          if (chip) { chip.classList.remove('icon-load-failed'); }
-          var iconImg = favoritesBtn.querySelector('.mobile-bottom-nav-icon-img');
-          if (iconImg) {
-            iconImg.src = 'https://aramabul.com/assets/fav.png';
-            iconImg.style.display = 'block';
-            iconImg.style.width = '22px';
-            iconImg.style.height = '22px';
-          }
-          var iconSvg = favoritesBtn.querySelector('.mobile-bottom-nav-icon-svg');
-          if (iconSvg) { iconSvg.style.display = 'none'; }
-        }
-
-        // Force active nav icon color to #3c4b49, non-active white
+        // Replace footer nav PNG icons with custom SVGs
         mobileNav.querySelectorAll('.mobile-bottom-nav-btn').forEach(function(btn) {
-          var isActive = btn.classList.contains('active');
-          if (isActive) {
-            btn.style.filter = 'brightness(0.25)';
+          var type = btn.getAttribute('data-mobile-nav') || btn.dataset.mobileNav;
+          var img = btn.querySelector('.mobile-bottom-nav-icon-img');
+          var chip = btn.querySelector('.mobile-bottom-nav-chip');
+          if (img) {
+            if (type === 'home') { img.src = 'assets/ev.svg'; }
+            else if (type === 'favorites') { img.src = 'assets/fav.svg'; }
+            else if (type === 'profile') { img.src = 'assets/ayar.svg'; }
+            img.style.display = 'block';
+            img.style.width = '22px';
+            img.style.height = '22px';
+          }
+          if (type === 'home' || type === 'favorites' || type === 'profile') {
+            if (chip) { chip.classList.remove('icon-load-failed'); }
+            var svg = btn.querySelector('.mobile-bottom-nav-icon-svg');
+            if (svg) { svg.style.display = 'none'; }
+          }
+          // Active icon styling
+          if (btn.classList.contains('active')) {
+            if (chip) { chip.style.filter = 'none'; }
+            if (img) { img.style.filter = 'brightness(1.5)'; }
             var label = btn.querySelector('.mobile-bottom-nav-label');
-            if (label) { label.style.color = '#3c4b49'; }
+            if (label) { label.style.color = '#a8d5a2'; }
           }
         });
       }
@@ -1132,6 +1139,18 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
         var sidebar = document.querySelector('.settings-sidebar-card');
         if (panelStack) { panelStack.style.display = 'block'; }
         if (sidebar) { sidebar.style.display = 'none'; }
+        // Ensure bottom nav buttons work on settings sub-pages
+        setTimeout(function() {
+          document.querySelectorAll('.mobile-bottom-nav-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+              var type = btn.getAttribute('data-mobile-nav') || btn.dataset.mobileNav;
+              if (type === 'home') { window.location.href = 'index.html'; }
+              else if (type === 'search') { window.location.href = 'search.html'; }
+              else if (type === 'favorites') { window.location.href = 'favorites.html'; }
+              else if (type === 'profile') { window.location.href = 'profile.html?action=profile'; }
+            });
+          });
+        }, 500);
       }
     ''');
   }
@@ -1433,12 +1452,37 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
                   WebViewWidget(controller: _controller),
                   if (_lastError != null) _buildErrorOverlay(),
                   // Theme overlay to prevent flash of unstyled content
-                  if (_isPageTransitioning && _hasLoadedAtLeastOnce)
+                  if (_isPageTransitioning || !_hasLoadedAtLeastOnce)
                     Positioned.fill(
                       child: AnimatedOpacity(
-                        opacity: _isPageTransitioning ? 1.0 : 0.0,
-                        duration: const Duration(milliseconds: 200),
-                        child: Container(color: const Color(0xFF45503f)),
+                        opacity: (_isPageTransitioning || !_hasLoadedAtLeastOnce) ? 1.0 : 0.0,
+                        duration: const Duration(milliseconds: 250),
+                        child: Container(
+                          color: const Color(0xFF45503f),
+                          child: !_hasLoadedAtLeastOnce
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset(
+                                      'assets/logoNew.png',
+                                      width: 80,
+                                      height: 80,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Color(0xFFa8d5a2),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : null,
+                        ),
                       ),
                     ),
                 ],

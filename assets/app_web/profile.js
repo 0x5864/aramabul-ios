@@ -870,16 +870,6 @@
     panels.forEach((panel) => {
       panel.hidden = String(panel.dataset.settingsPanel || "") !== nextPanel;
     });
-
-    // On mobile/forced-mobile, show panel-stack and hide sidebar when a sub-panel is active
-    const isMobileView = !shouldUseInlinePanels();
-    const isSubPanel = nextPanel !== "account";
-    if (settingsPanelStack instanceof HTMLElement) {
-      settingsPanelStack.style.display = isMobileView && isSubPanel ? "block" : "";
-    }
-    if (settingsSidebarCard instanceof HTMLElement) {
-      settingsSidebarCard.style.display = isMobileView && isSubPanel ? "none" : "";
-    }
   }
 
   function shouldForceMobileLayout() {
