@@ -1,49 +1,36 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_wkwebview/webview_flutter_wkwebview.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 
 import 'welcome_screen.dart';
 import 'screens/explore_screen.dart';
-import 'screens/map_explore_screen.dart';
+import 'screens/search_screen.dart';
 import 'screens/favorites_screen.dart';
 import 'screens/settings_screen.dart';
-import 'models/venue.dart';
-import 'services/venue_service.dart';
 
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
 
-/// Live URL — the primary source when online.
+/// Live URL — used only for deep links and API base.
 const String kLiveUrl = 'https://aramabul.com';
 
-/// Bundled fallback — used only when there is no internet connection.
-const String kBundledEntryAssetPath = 'assets/app_web/index.html';
-
-const String kDeepLinkHost = 'aramabul.com';
-const String kDeepLinkHostWww = 'www.aramabul.com';
-
-/// App version string injected into the WebView so the web code can detect it.
-const String kAppVersion = '1.0.0';
+/// App version string.
+const String kAppVersion = '1.0.1';
 
 const String _kWelcomeSeenKey = 'welcome_seen';
 
 /// Global app language selected on welcome screen (e.g. 'TR', 'EN', 'DE', 'RU')
+// ignore: unused_element
 String _globalAppLanguage = 'TR';
 
 void main() async {
@@ -69,15 +56,18 @@ class AramaBulApp extends StatelessWidget {
       title: 'AramaBul',
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2d6b3f)),
-        scaffoldBackgroundColor: const Color(0xFF45503f),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF094174)),
+        scaffoldBackgroundColor: const Color(0xFF094174),
+        textTheme: GoogleFonts.plusJakartaSansTextTheme(
+          ThemeData.dark().textTheme,
+        ),
       ),
       home: const AppEntryPoint(),
     );
   }
 }
 
-/// Decides whether to show the welcome screen or go directly to WebView.
+/// Decides whether to show the welcome screen or go directly to the app.
 class AppEntryPoint extends StatefulWidget {
   const AppEntryPoint({super.key});
 
@@ -87,11 +77,25 @@ class AppEntryPoint extends StatefulWidget {
 
 class _AppEntryPointState extends State<AppEntryPoint> {
   bool? _showWelcome;
+  bool _googleInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _checkFirstLaunch();
+    _initGoogleSignIn();
+  }
+
+  Future<void> _initGoogleSignIn() async {
+    try {
+      await GoogleSignIn.instance.initialize(
+        serverClientId:
+            '849707147159-94nfr5dv3ic23d3t80qfdvfhoq9gd4mv.apps.googleusercontent.com',
+      );
+      _googleInitialized = true;
+    } catch (e) {
+      debugPrint('[GoogleSignIn] Init failed: $e');
+    }
   }
 
   Future<void> _checkFirstLaunch() async {
@@ -106,19 +110,12 @@ class _AppEntryPointState extends State<AppEntryPoint> {
 
     switch (route) {
       case 'login':
-        // Open standalone login page — can go back to welcome
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const _AuthPage(mode: 'login', title: 'Giriş Yap'),
-          ),
-        );
-        break;
-
       case 'register':
-        // Open standalone signup page — can go back to welcome
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const _AuthPage(mode: 'signup', title: 'Hesap Oluştur'),
+        // No WebView login — show snackbar directing to social login
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Lütfen Google veya Apple ile giriş yapın.'),
+            backgroundColor: Color(0xFF094174),
           ),
         );
         break;
@@ -136,31 +133,22 @@ class _AppEntryPointState extends State<AppEntryPoint> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Facebook ile giriş yakında aktif olacak.'),
-            backgroundColor: Color(0xFF45503f),
+            backgroundColor: Color(0xFF094174),
           ),
         );
         break;
 
       case 'privacy':
-        // Open lightweight policy viewer — can go back to welcome
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const _PolicyViewerPage(
-              title: 'Gizlilik Politikası',
-              url: 'https://aramabul.com/gizlilik-politikasi.html',
-            ),
-          ),
+        launchUrl(
+          Uri.parse('https://aramabul.com/gizlilik-politikasi.html'),
+          mode: LaunchMode.externalApplication,
         );
         break;
 
       case 'terms':
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => const _PolicyViewerPage(
-              title: 'Kullanım Koşulları',
-              url: 'https://aramabul.com/kullanim-kosullari.html',
-            ),
-          ),
+        launchUrl(
+          Uri.parse('https://aramabul.com/kullanim-kosullari.html'),
+          mode: LaunchMode.externalApplication,
         );
         break;
 
@@ -174,12 +162,17 @@ class _AppEntryPointState extends State<AppEntryPoint> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(langCode == 'tr' ? 'Dil: Türkçe' : langCode == 'en' ? 'Language: English' : langCode == 'de' ? 'Sprache: Deutsch' : 'Язык: Русский'),
-            backgroundColor: const Color(0xFF093827),
+            content: Text(langCode == 'tr'
+                ? 'Dil: Türkçe'
+                : langCode == 'en'
+                    ? 'Language: English'
+                    : langCode == 'de'
+                        ? 'Sprache: Deutsch'
+                        : 'Язык: Русский'),
+            backgroundColor: const Color(0xFF094174),
             duration: const Duration(seconds: 1),
           ),
         );
-        // Store globally so HomeWebViewPage can use it
         _globalAppLanguage = langCode.toUpperCase();
         break;
 
@@ -189,9 +182,7 @@ class _AppEntryPointState extends State<AppEntryPoint> {
         await prefsG.setBool(_kWelcomeSeenKey, true);
         if (!mounted) return;
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const TabShell(),
-          ),
+          MaterialPageRoute(builder: (_) => const TabShell()),
         );
     }
   }
@@ -221,28 +212,26 @@ class _AppEntryPointState extends State<AppEntryPoint> {
       client.close();
     } catch (e) {
       debugPrint('[SocialLogin] Backend registration failed: $e');
-      // Don't block login — just log the error
     }
   }
 
   Future<void> _handleGoogleSignIn() async {
     try {
-      await GoogleSignIn.instance.initialize(
-        serverClientId: '481244794487-v5at2f43oeth0cqef3bhr6u5rc7lo7ef.apps.googleusercontent.com',
-      );
+      if (!_googleInitialized) {
+        await _initGoogleSignIn();
+      }
       final account = await GoogleSignIn.instance.authenticate();
-      if (account == null) return; // User cancelled
+      // ignore: unnecessary_null_comparison
+      if (account == null) return;
 
       final name = account.displayName ?? '';
       final email = account.email;
 
-      // Save session locally
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_kWelcomeSeenKey, true);
       await prefs.setString('auth_user_name', name);
       await prefs.setString('auth_user_email', email);
 
-      // Register with backend (fire-and-forget)
       _registerSocialLogin(
         provider: 'google',
         email: email,
@@ -268,15 +257,13 @@ class _AppEntryPointState extends State<AppEntryPoint> {
 
   Future<void> _handleAppleSignIn() async {
     try {
-      debugPrint('[AppleSignIn] Starting...');
       final isAvailable = await SignInWithApple.isAvailable();
-      debugPrint('[AppleSignIn] isAvailable: $isAvailable');
       if (!isAvailable) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Apple ile giriş bu cihazda desteklenmiyor.'),
-            backgroundColor: Color(0xFF093827),
+            backgroundColor: Color(0xFF094174),
           ),
         );
         return;
@@ -289,15 +276,10 @@ class _AppEntryPointState extends State<AppEntryPoint> {
         ],
         webAuthenticationOptions: WebAuthenticationOptions(
           clientId: 'com.aramabul.app.signin',
-          redirectUri: Uri.parse('https://aramabul.com/api/auth/apple-callback'),
+          redirectUri:
+              Uri.parse('https://aramabul.com/api/auth/apple-callback'),
         ),
       );
-
-      debugPrint('[AppleSignIn] Got credential!');
-      debugPrint('[AppleSignIn] givenName: ${credential.givenName}');
-      debugPrint('[AppleSignIn] familyName: ${credential.familyName}');
-      debugPrint('[AppleSignIn] email: ${credential.email}');
-      debugPrint('[AppleSignIn] userIdentifier: ${credential.userIdentifier}');
 
       final name = [
         credential.givenName ?? '',
@@ -305,17 +287,14 @@ class _AppEntryPointState extends State<AppEntryPoint> {
       ].where((s) => s.isNotEmpty).join(' ');
       final email = credential.email ?? '';
 
-      // Save session locally
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_kWelcomeSeenKey, true);
       if (name.isNotEmpty) await prefs.setString('auth_user_name', name);
       if (email.isNotEmpty) await prefs.setString('auth_user_email', email);
-      // Always save the Apple user identifier
       if (credential.userIdentifier != null) {
         await prefs.setString('auth_apple_id', credential.userIdentifier!);
       }
 
-      // Register with backend (fire-and-forget)
       _registerSocialLogin(
         provider: 'apple',
         email: email,
@@ -323,22 +302,15 @@ class _AppEntryPointState extends State<AppEntryPoint> {
         providerId: credential.userIdentifier,
       );
 
-      debugPrint('[AppleSignIn] Prefs saved, navigating to home...');
-      debugPrint('[AppleSignIn] mounted: $mounted');
-
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const TabShell()),
         (route) => false,
       );
-      debugPrint('[AppleSignIn] Navigation done!');
-    } catch (e, stack) {
-      debugPrint('[AppleSignIn] ERROR: $e');
-      debugPrint('[AppleSignIn] Stack: $stack');
+    } catch (e) {
       if (!mounted) return;
       if (e is SignInWithAppleAuthorizationException &&
           e.code == AuthorizationErrorCode.canceled) {
-        debugPrint('[AppleSignIn] User cancelled');
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
@@ -353,9 +325,8 @@ class _AppEntryPointState extends State<AppEntryPoint> {
   @override
   Widget build(BuildContext context) {
     if (_showWelcome == null) {
-      // Loading state
       return const Scaffold(
-        backgroundColor: Color(0xFF45503f),
+        backgroundColor: Color(0xFF094174),
         body: Center(
           child: CircularProgressIndicator(color: Colors.white),
         ),
@@ -370,194 +341,10 @@ class _AppEntryPointState extends State<AppEntryPoint> {
   }
 }
 
-/// Lightweight policy/terms viewer — AppBar with back button, no footer/breadcrumb.
-class _PolicyViewerPage extends StatefulWidget {
-  final String title;
-  final String url;
+// ==========================================================================
+// TabShell — 100% Native bottom navigation with IndexedStack
+// ==========================================================================
 
-  const _PolicyViewerPage({required this.title, required this.url});
-
-  @override
-  State<_PolicyViewerPage> createState() => _PolicyViewerPageState();
-}
-
-class _PolicyViewerPageState extends State<_PolicyViewerPage> {
-  late final WebViewController _controller;
-  bool _isLoading = true;
-
-  static const String _injectJs =
-      'var _s=document.createElement("style");'
-      '_s.textContent=".mobile-bottom-nav{display:none!important}'
-      '.global-topbar{display:none!important}'
-      '.global-topline{display:none!important}'
-      '.yr-footer{display:none!important}'
-      '.auth-modal{display:none!important}'
-      '.global-header-band{padding-top:1rem!important}";'
-      'document.head.appendChild(_s);'
-      'function _h(){document.querySelectorAll(".mobile-bottom-nav,.global-topbar,.global-topline,.yr-footer,.auth-modal").forEach(function(e){e.remove()})}'
-      '_h();'
-      'if(document.body){new MutationObserver(_h).observe(document.body,{childList:true,subtree:true});'
-      'document.body.classList.remove("mobile-bottom-nav-visible")}';
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) {
-            _controller.runJavaScript(_injectJs);
-          },
-          onPageFinished: (_) {
-            _controller.runJavaScript(_injectJs);
-            if (mounted) setState(() => _isLoading = false);
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse(widget.url));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
-        backgroundColor: const Color(0xFF45503f),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Stack(
-        children: [
-          WebViewWidget(controller: _controller),
-          if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(color: Color(0xFF2d6b3f)),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Unified auth page — full-screen form for login or signup (no tabs).
-class _AuthPage extends StatefulWidget {
-  final String mode;
-  final String title;
-
-  const _AuthPage({required this.mode, required this.title});
-
-  @override
-  State<_AuthPage> createState() => _AuthPageState();
-}
-
-class _AuthPageState extends State<_AuthPage> {
-  late final WebViewController _controller;
-  bool _isLoading = true;
-
-  String get _hideLoginForm => widget.mode == 'signup'
-      ? '#globalLoginForm{display:none!important}'
-      : '#globalSignupForm{display:none!important}#globalLoginSignupHint{display:none!important}';
-
-  String get _injectJs =>
-      'var _s=document.createElement("style");'
-      '_s.textContent=".mobile-bottom-nav{display:none!important}'
-      '.global-topbar{display:none!important}'
-      '.global-topline{display:none!important}'
-      '.global-header-band{display:none!important}'
-      '.yr-footer{display:none!important}'
-      'body>.texture{display:none!important}'
-      'body>main,body>.content,body>section{display:none!important}'
-      '.auth-modal{position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:0!important;background:#fffaed!important;display:flex!important;align-items:flex-start!important;justify-content:center!important;z-index:99999!important}'
-      '.auth-modal.is-hidden{display:flex!important}'
-      '.auth-modal-panel{position:relative!important;width:100%!important;max-width:100%!important;margin:0!important;border-radius:0!important;box-shadow:none!important;min-height:100vh!important;padding-top:1rem!important}'
-      '.auth-modal-close{display:none!important}'
-      '.auth-mode-tabs{display:none!important}'
-      '$_hideLoginForm'
-      'body{background:#fffaed!important;overflow:auto!important}";'
-      'document.head.appendChild(_s);'
-      'function _h(){document.querySelectorAll(".mobile-bottom-nav,.global-topbar,.global-topline,.yr-footer,.global-header-band").forEach(function(e){e.remove()})}'
-      '_h();'
-      'if(document.body){new MutationObserver(_h).observe(document.body,{childList:true,subtree:true});'
-      'document.body.classList.remove("mobile-bottom-nav-visible")}';
-
-  Future<void> _onAuthSuccess() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('welcome_seen', true);
-    if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const TabShell()),
-      (route) => false,
-    );
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..addJavaScriptChannel(
-        'FlutterAuth',
-        onMessageReceived: (message) {
-          if (message.message == 'success') {
-            _onAuthSuccess();
-          }
-        },
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) {
-            _controller.runJavaScript(_injectJs);
-          },
-          onPageFinished: (_) {
-            _controller.runJavaScript(_injectJs);
-            // Open modal + listen for auth success
-            _controller.runJavaScript(
-              'setTimeout(function(){'
-              'if(window.ARAMABUL_AUTH_MODAL&&window.ARAMABUL_AUTH_MODAL.open){window.ARAMABUL_AUTH_MODAL.open("${widget.mode}");}'
-              'document.addEventListener("aramabul:authchange",function(){FlutterAuth.postMessage("success");});'
-              'var _m=document.querySelector("#globalAuthModal");'
-              'if(_m){var _ob=new MutationObserver(function(){if(_m.classList.contains("is-hidden")){FlutterAuth.postMessage("success");}});'
-              '_ob.observe(_m,{attributes:true,attributeFilter:["class"]});}'
-              '},300);'
-            );
-            if (mounted) setState(() => _isLoading = false);
-          },
-        ),
-      )
-      ..loadRequest(Uri.parse('https://aramabul.com/'));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-        ),
-        backgroundColor: const Color(0xFF45503f),
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Stack(
-        children: [
-          WebViewWidget(controller: _controller),
-          if (_isLoading)
-            const Center(
-              child: CircularProgressIndicator(color: Color(0xFF2d6b3f)),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Native tab shell — provides bottom navigation with native screens.
-/// This is the key architectural change for Apple Guideline 4.2.2.
 class TabShell extends StatefulWidget {
   const TabShell({super.key});
 
@@ -568,11 +355,43 @@ class TabShell extends StatefulWidget {
 class _TabShellState extends State<TabShell> {
   int _currentIndex = 0;
 
+  // AdMob banner
+  BannerAd? _bannerAd;
+  bool _isBannerLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBannerAd();
+  }
+
+  void _loadBannerAd() {
+    _bannerAd = BannerAd(
+      adUnitId: 'ca-app-pub-3016888060216617/4581966772',
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (mounted) setState(() => _isBannerLoaded = true);
+        },
+        onAdFailedToLoad: (ad, error) {
+          debugPrint('[AdMob] Banner failed: $error');
+          ad.dispose();
+          _bannerAd = null;
+        },
+      ),
+    )..load();
+  }
+
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
+  }
+
   void _goToWelcome() {
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => const AppEntryPoint(),
-      ),
+      MaterialPageRoute(builder: (_) => const AppEntryPoint()),
       (route) => false,
     );
   }
@@ -580,68 +399,94 @@ class _TabShellState extends State<TabShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          const ExploreScreen(),
-          const MapExploreScreen(),
-          const FavoritesScreen(),
-          SettingsScreen(onSignOut: _goToWelcome),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF45503f),
-          border: Border(top: BorderSide(color: Color(0xFF5a7d5c), width: 0.5)),
+      backgroundColor: const Color(0xFF094174),
+      body: SafeArea(
+        bottom: false,
+        child: IndexedStack(
+          index: _currentIndex,
+          children: [
+            const ExploreScreen(),
+            const SearchScreen(),
+            const FavoritesScreen(),
+            SettingsScreen(onSignOut: _goToWelcome),
+          ],
         ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _NavItem(
-                  icon: Icons.explore_rounded,
-                  label: 'Keşfet',
-                  isActive: _currentIndex == 0,
-                  onTap: () => setState(() => _currentIndex = 0),
-                ),
-                _NavItem(
-                  icon: Icons.map_rounded,
-                  label: 'Harita',
-                  isActive: _currentIndex == 1,
-                  onTap: () => setState(() => _currentIndex = 1),
-                ),
-                _NavItem(
-                  icon: Icons.favorite_rounded,
-                  label: 'Favoriler',
-                  isActive: _currentIndex == 2,
-                  onTap: () => setState(() => _currentIndex = 2),
-                ),
-                _NavItem(
-                  icon: Icons.person_rounded,
-                  label: 'Profil',
-                  isActive: _currentIndex == 3,
-                  onTap: () => setState(() => _currentIndex = 3),
-                ),
-              ],
+      ),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Bottom nav bar
+          Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF094174),
+              border: Border(
+                top: BorderSide(color: Color(0xFF1a5a8a), width: 0.5),
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                    _NavItem(
+                      assetPath: 'assets/welcome/ev.png',
+                      label: 'Ana Sayfa',
+                      isActive: _currentIndex == 0,
+                      onTap: () => setState(() => _currentIndex = 0),
+                    ),
+                    _NavItem(
+                      icon: Icons.search_rounded,
+                      label: 'Ara',
+                      isActive: _currentIndex == 1,
+                      onTap: () => setState(() => _currentIndex = 1),
+                    ),
+                    _NavItem(
+                      assetPath: 'assets/welcome/fav.png',
+                      label: 'Favoriler',
+                      isActive: _currentIndex == 2,
+                      onTap: () => setState(() => _currentIndex = 2),
+                    ),
+                    _NavItem(
+                      assetPath: 'assets/welcome/ayar.png',
+                      label: 'Ayarlar',
+                      isActive: _currentIndex == 3,
+                      onTap: () => setState(() => _currentIndex = 3),
+                    ),
+                ],
+              ),
             ),
           ),
-        ),
+          // AdMob banner
+          if (_isBannerLoaded && _bannerAd != null)
+            SafeArea(
+              top: false,
+              child: Container(
+                color: const Color(0xFF094174),
+                width: double.infinity,
+                height: _bannerAd!.size.height.toDouble(),
+                child: AdWidget(ad: _bannerAd!),
+              ),
+            ),
+        ],
       ),
     );
   }
 }
 
+// ==========================================================================
+// Navigation bar item
+// ==========================================================================
+
 class _NavItem extends StatelessWidget {
-  final IconData icon;
+  final IconData? icon;
+  final String? assetPath;
   final String label;
   final bool isActive;
   final VoidCallback onTap;
 
   const _NavItem({
-    required this.icon,
+    this.icon,
+    this.assetPath,
     required this.label,
     required this.isActive,
     required this.onTap,
@@ -649,6 +494,9 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = isActive
+        ? const Color(0xFF7bbce8)
+        : Colors.white.withValues(alpha: 0.7);
     return GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
@@ -660,912 +508,26 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 24,
-              color: isActive
-                  ? const Color(0xFF1a2e1a)
-                  : Colors.white.withValues(alpha: 0.7),
-            ),
+            if (assetPath != null)
+              Image.asset(
+                assetPath!,
+                width: 20,
+                height: 20,
+                color: color,
+                fit: BoxFit.contain,
+              )
+            else
+              Icon(icon, size: 20, color: color),
             const SizedBox(height: 2),
             Text(
               label,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                color: isActive
-                    ? const Color(0xFF1a2e1a)
-                    : Colors.white.withValues(alpha: 0.7),
+                color: color,
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class HomeWebViewPage extends StatefulWidget {
-  final String? initialPath;
-
-  const HomeWebViewPage({super.key, this.initialPath});
-
-  @override
-  State<HomeWebViewPage> createState() => _HomeWebViewPageState();
-}
-
-class _HomeWebViewPageState extends State<HomeWebViewPage> {
-  late final WebViewController _controller;
-  bool _isLoading = true;
-  int _progress = 0;
-  String? _lastError;
-  bool _hasLoadedAtLeastOnce = false;
-  bool _isPageTransitioning = false;
-  bool _isOffline = false;
-
-  // ---------------------------------------------------------------------------
-  // AdMob
-  // ---------------------------------------------------------------------------
-  static const String _bannerAdUnitId = 'ca-app-pub-3016888060216617/4581966772';
-  static const String _interstitialAdUnitId = 'ca-app-pub-3016888060216617/3737834565';
-  BannerAd? _bannerAd;
-  bool _isBannerReady = false;
-  InterstitialAd? _interstitialAd;
-  int _pageNavigationCount = 0;
-  static const int _interstitialInterval = 15; // Show interstitial every N pages
-
-  // ---------------------------------------------------------------------------
-  // URL helpers
-  // ---------------------------------------------------------------------------
-
-  bool _isMapLikeUrl(Uri uri, String rawUrl) {
-    final scheme = uri.scheme.toLowerCase();
-    final host = uri.host.toLowerCase();
-    final path = uri.path.toLowerCase();
-    final raw = rawUrl.toLowerCase();
-
-    if (scheme == 'intent' || scheme == 'geo' || scheme == 'comgooglemaps') {
-      return true;
-    }
-    if (host.contains('maps.google.') || host == 'maps.app.goo.gl') {
-      return true;
-    }
-    if (host.contains('google.com') && path.startsWith('/maps')) {
-      return true;
-    }
-    return raw.contains('google.com/maps') || raw.contains('maps.app.goo.gl');
-  }
-
-  Uri _resolveExternalUri(String rawUrl) {
-    final raw = rawUrl.trim();
-    if (raw.toLowerCase().startsWith('intent://')) {
-      final intentPrefix = 'intent://';
-      final intentIndex = raw.indexOf('#Intent;');
-      final body = intentIndex >= 0 ? raw.substring(0, intentIndex) : raw;
-      final meta = intentIndex >= 0 ? raw.substring(intentIndex) : '';
-      final defaultHostPath = body.substring(intentPrefix.length);
-      var scheme = 'https';
-      final schemeMatch = RegExp(r';scheme=([^;]+);').firstMatch(meta);
-      if (schemeMatch != null) {
-        scheme = (schemeMatch.group(1) ?? 'https').trim();
-      }
-      return Uri.parse('$scheme://$defaultHostPath');
-    }
-    return Uri.parse(raw);
-  }
-
-  bool _isDeepLink(Uri uri) {
-    final host = uri.host.toLowerCase();
-    return host == kDeepLinkHost || host == kDeepLinkHostWww;
-  }
-
-  Future<NavigationDecision> _onNavigationRequest(
-    NavigationRequest request,
-  ) async {
-    final rawUrl = request.url.trim();
-    final parsed = Uri.tryParse(rawUrl);
-    if (parsed == null) return NavigationDecision.navigate;
-
-    // Deep links from aramabul.com stay in WebView.
-    if (_isDeepLink(parsed)) return NavigationDecision.navigate;
-
-    final scheme = parsed.scheme.toLowerCase();
-    final shouldOpenExternally = _isMapLikeUrl(parsed, rawUrl) ||
-        (scheme != 'http' &&
-            scheme != 'https' &&
-            scheme != 'about' &&
-            scheme != 'file' &&
-            scheme != 'data' &&
-            scheme != 'javascript');
-
-    if (!shouldOpenExternally) return NavigationDecision.navigate;
-
-    Uri externalUri;
-    try {
-      externalUri = _resolveExternalUri(rawUrl);
-    } catch (error) {
-      debugPrint('Dis URL cozumleme hatasi: $error');
-      return NavigationDecision.prevent;
-    }
-    await launchUrl(externalUri, mode: LaunchMode.externalApplication);
-    return NavigationDecision.prevent;
-  }
-
-  // ---------------------------------------------------------------------------
-  // Geolocation permission
-  // ---------------------------------------------------------------------------
-
-  Future<void> _requestLocationPermission() async {
-    final status = await Permission.locationWhenInUse.request();
-    debugPrint('Location permission: $status');
-  }
-
-  // ---------------------------------------------------------------------------
-  // JS ↔ Dart bridge
-  // ---------------------------------------------------------------------------
-
-  /// Inject a JavaScript channel so the web code can call into Dart.
-  ///
-  /// From JS:  AramaBulAndroid.postMessage(JSON.stringify({action:'...'}))
-  void _setupJsBridge() {
-    _controller.addJavaScriptChannel(
-      'AramaBulIOS',
-      onMessageReceived: (JavaScriptMessage message) {
-        _handleJsMessage(message.message);
-      },
-    );
-  }
-
-  void _handleJsMessage(String raw) {
-    try {
-      final data = jsonDecode(raw) as Map<String, dynamic>;
-      final action = data['action'] as String? ?? '';
-
-      switch (action) {
-        case 'getAppInfo':
-          _controller.runJavaScript(
-            'window.__ARAMABUL_APP__ = ${jsonEncode({
-                  'platform': 'ios',
-                  'version': kAppVersion,
-                  'isApp': true,
-                })}',
-          );
-          break;
-        case 'shareVenue':
-          final title = data['title'] as String? ?? 'AramaBul';
-          final url = data['url'] as String? ?? kLiveUrl;
-          Share.share('$title $url');
-          break;
-        case 'addFavorite':
-          // Save venue to native favorites
-          try {
-            final venue = Venue.fromJson(data['venue'] as Map<String, dynamic>);
-            VenueService.addFavorite(venue);
-            HapticFeedback.mediumImpact();
-          } catch (e) {
-            debugPrint('addFavorite parse error: $e');
-          }
-          break;
-        case 'removeFavorite':
-          final venueId = data['venueId'] as int? ?? 0;
-          if (venueId > 0) VenueService.removeFavorite(venueId);
-          break;
-        case 'accountDeleted':
-          // User deleted account via WebView — go to welcome
-          SharedPreferences.getInstance().then((prefs) {
-            prefs.remove('auth_user_name');
-            prefs.remove('auth_user_email');
-            prefs.setBool('welcome_seen', false);
-          });
-          break;
-        default:
-          debugPrint('Unknown JS action: $action');
-      }
-    } catch (e) {
-      debugPrint('JS bridge parse error: $e');
-    }
-  }
-
-  /// After every page load, inject a global flag so the web code knows
-  /// it is running inside the Android app.
-  /// Also inject CSS overrides for app-specific visual fixes.
-  Future<void> _injectAppFlag() async {
-    // Read auth from SharedPreferences to sync with WebView
-    final prefs = await SharedPreferences.getInstance();
-    final authName = prefs.getString('auth_user_name') ?? '';
-    final authEmail = prefs.getString('auth_user_email') ?? '';
-    final authSessionJson = (authName.isNotEmpty && authEmail.isNotEmpty)
-        ? '{"name":"${authName.replaceAll('"', '\\"')}","email":"${authEmail.replaceAll('"', '\\"')}"}'
-        : '';
-
-    await _controller.runJavaScript('''
-      window.__ARAMABUL_APP__ = {
-        platform: 'ios',
-        version: '$kAppVersion',
-        isApp: true
-      };
-
-      // Sync auth session from native app to WebView localStorage
-      ${authSessionJson.isNotEmpty ? "try { localStorage.setItem('aramabul.auth.session.v1', '$authSessionJson'); document.dispatchEvent(new CustomEvent('aramabul:authchange')); } catch(e) {}" : ""}
-
-      // Inject app-specific CSS fixes
-      if (!document.getElementById('aramabul-app-css')) {
-        var style = document.createElement('style');
-        style.id = 'aramabul-app-css';
-        style.textContent = 
-          '@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap");' +
-          'body, * { font-family: "Plus Jakarta Sans", sans-serif !important; }' +
-          'body { background: #45503f !important; }' +
-          '.global-header-band { display: none !important; }' +
-          '.home-hero-search { display: none !important; }' +
-          '.hero { padding-top: 0 !important; }' +
-          '.hero-content { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; }' +
-          '.istanbul-discovery-shell { background: transparent !important; }' +
-          '.istanbul-discovery-copy, .istanbul-discovery-hero-card { border: none !important; background: transparent !important; box-shadow: none !important; border-radius: 0 !important; }' +
-          '.istanbul-results-shell { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 8px !important; }' +
-          '.istanbul-filter-card { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; overflow: visible !important; }' +
-          '.istanbul-filter-body, .istanbul-filter-yeme-icme-sidebar, .istanbul-filter-yeme-icme-sidebar--gezi-two-up { overflow: visible !important; }' +
-          '.istanbul-filter-location-box, .istanbul-filter-section-box { background: #e8c37b !important; border: none !important; border-radius: 14px !important; padding: 12px !important; margin-bottom: 8px !important; overflow: visible !important; position: relative !important; }' +
-          '.istanbul-filter-location-box-title, .istanbul-filter-section-box-title, .istanbul-filter-gezi-category-box .istanbul-filter-section-box-title { color: #000000 !important; }' +
-          '.istanbul-filter-location-box { z-index: 200 !important; }' +
-          '.istanbul-filter-section-box { z-index: 100 !important; }' +
-          '.kesfet-category-dropdown-btn, .lang-switch-btn { display: flex !important; align-items: center !important; justify-content: space-between !important; width: 100% !important; background: #ffffff !important; color: #011d36 !important; border: 1px solid rgba(164,179,181,0.82) !important; border-radius: 6px !important; padding: 0.5rem 0.65rem !important; font-size: 0.84rem !important; cursor: pointer !important; box-sizing: border-box !important; }' +
-          '.istanbul-filter-field { display: block !important; margin-bottom: 6px !important; }' +
-          '.istanbul-filter-field > span { display: block !important; margin-bottom: 4px !important; font-size: 0.82rem !important; color: #000000 !important; }' +
-          '.istanbul-filter-location-box .kesfet-category-dropdown, .istanbul-filter-section-box .kesfet-category-dropdown { position: relative !important; z-index: 1200 !important; }' +
-          '.kesfet-category-dropdown-menu { position: absolute !important; left: 0 !important; top: calc(100% + 4px) !important; width: max-content !important; min-width: 100% !important; max-width: calc(100vw - 24px) !important; background: #ffffff !important; border: 1px solid #c2d8c0 !important; border-radius: 6px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important; z-index: 1200 !important; overflow-y: auto !important; max-height: 50vh !important; display: flex !important; flex-direction: column !important; padding: 0 !important; }' +
-          '.kesfet-category-dropdown-menu[hidden] { display: none !important; }' +
-          '.kesfet-category-dropdown.is-open .kesfet-category-dropdown-menu { display: flex !important; }' +
-          '.lang-switch-menu { position: absolute !important; background: #ffffff !important; border: 1px solid #c2d8c0 !important; border-radius: 6px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important; z-index: 1200 !important; overflow-y: auto !important; max-height: 50vh !important; }' +
-          '.lang-switch-menu[hidden] { display: none !important; }' +
-          '.featured-venues-section { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding-left: 0 !important; padding-right: 0 !important; padding-bottom: 0 !important; }' +
-          '.featured-venues-panel { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; }' +
-          '.featured-venues-grid { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; margin: 0 !important; }' +
-          '.content-guide { background: #d7d7d7 !important; border: none !important; box-shadow: none !important; border-radius: 14px !important; padding: 16px !important; margin-top: 12px !important; }' +
-          '.content-guide.home-ustalara-saygi { background: #e8c37b !important; border-radius: 14px !important; }' +
-          '.home-empty-box { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; padding: 0 !important; }' +
-          '.home-subcategory-list { background: transparent !important; border: none !important; box-shadow: none !important; border-radius: 0 !important; display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 0.5rem !important; }' +
-          '.home-subcat-chip { border-radius: 8px !important; padding: 0.5rem 0.25rem !important; font-size: 0.8rem !important; }' +
-          '.content-guide h2, .content-guide h3, .content-guide p, .content-guide li, .content-guide strong { color: #000 !important; }' +
-          '.home-top-category-row { background: transparent !important; display: grid !important; grid-template-columns: repeat(3, 1fr) !important; gap: 0.5rem !important; }' +
-          '.istanbul-venue-card { background: #d5e8d3 !important; border-color: #d5e8d3 !important; }' +
-          '.istanbul-results-grid { padding: 0 !important; }' +
-          '.home-subcat-chip { background: #fdf8f0 !important; border: none !important; border-radius: 8px !important; padding: 0.5rem 0.25rem !important; font-size: 0.76rem !important; font-weight: 600 !important; color: #093826 !important; }' +
-          '.category-home-card .top-city-thumb { display: none !important; }' +
-          '.top-city-card, .category-home-card { background: #71935d !important; border: none !important; border-radius: 8px !important; padding: 0.5rem 0.25rem !important; min-height: auto !important; aspect-ratio: auto !important; color: #fff !important; }' +
-          '.category-home-card .top-city-content { position: static !important; padding: 0 !important; text-align: center !important; }' +
-          '.top-city-name { font-size: 0.8rem !important; font-weight: 400 !important; color: #fff !important; }' +
-          '.istanbul-discovery-hero-label { background: #fdf8f0 !important; border: none !important; border-radius: 8px !important; color: #093826 !important; font-size: 0.76rem !important; font-weight: 600 !important; padding: 0.25rem 0.55rem !important; }' +
-          '.istanbul-venue-tag, .istanbul-venue-distance, .istanbul-venue-budget { background: #fdf8f0 !important; border: none !important; border-radius: 8px !important; color: #093826 !important; font-size: 0.76rem !important; font-weight: 600 !important; padding: 0.25rem 0.55rem !important; white-space: nowrap !important; }' +
-          '.istanbul-filter-nearby-panel-button, .istanbul-discovery-primary-button { background: #71935d !important; border: none !important; border-radius: 14px !important; color: #fff !important; }' +
-          '.venue-detail-main-card, .venue-detail-side-card { background: #ede4d5 !important; border: none !important; border-radius: 14px !important; }' +
-          '.venue-detail-media, .venue-detail-info, .venue-detail-reviews, .venue-detail-review-form { background: #d5e8d3 !important; border-color: #d5e8d3 !important; }' +
-          '.section-head h1, .section-head h2, .section-head h3, .province-head h1, .province-head h2, .province-head h3, .istanbul-discovery-copy h1, .istanbul-discovery-copy h2 { color: #ffffff !important; font-weight: 700 !important; margin-bottom: 0.75rem !important; }' +
-          '.istanbul-discovery-kicker, .istanbul-breadcrumb, .istanbul-breadcrumb a, .istanbul-breadcrumb a:visited, .istanbul-breadcrumb span, .istanbul-discovery-subline, .istanbul-discovery-location-note { color: #ffffff !important; }' +
-          '.istanbul-results-meta, .istanbul-results-state { color: #ffffff !important; }' +
-          '.mobile-bottom-nav { display: none !important; }' +
-          'body.mobile-bottom-nav-visible { padding-bottom: 0 !important; }' +
-          '.mobile-bottom-nav-btn .mobile-bottom-nav-chip { filter: brightness(10) !important; }' +
-          '.mobile-bottom-nav-btn .mobile-bottom-nav-label { color: #ffffff !important; }' +
-          '.mobile-bottom-nav-btn.active .mobile-bottom-nav-chip { filter: none !important; }' +
-          '.mobile-bottom-nav-btn.active .mobile-bottom-nav-icon-img { display: block !important; filter: brightness(1.5) !important; }' +
-          '.mobile-bottom-nav-btn.active:not([data-mobile-nav=\"search\"]) .mobile-bottom-nav-icon-svg { display: none !important; }' +
-          '.mobile-bottom-nav-btn.active[data-mobile-nav=\"search\"] .mobile-bottom-nav-icon-svg { color: #a8d5a2 !important; }' +
-          '.mobile-bottom-nav-btn.active .mobile-bottom-nav-label { color: #a8d5a2 !important; }' +
-          '.global-footer, .global-footer-band, .footer-band, .yr-footer { background: transparent !important; border: none !important; color: #ffffff !important; }' +
-          '.global-footer a, .global-footer-band a, .footer-band a, .yr-footer a { color: #ffffff !important; }' +
-          '.yr-footer h4 { color: #ffffff !important; }' +
-          '.settings-shell, .settings-layout { background: transparent !important; border: none !important; box-shadow: none !important; }' +
-          '.settings-page .hero, .settings-page .settings-shell { padding-top: 2rem !important; }' +
-          '.settings-card, .settings-panel-card, .settings-sidebar-card { background: #d5e8d3 !important; border-color: #c2d8c0 !important; border-radius: 4px !important; }' +
-          '.settings-feedback-field input, .settings-feedback-field textarea, .settings-feedback-field select, .settings-signup-field input, .settings-feedback-phone-group input { background: #fff !important; color: #000 !important; }' +
-          '.search-page-shell { background: transparent !important; border: none !important; box-shadow: none !important; }' +
-          '.search-page-note { display: none !important; }' +
-          '.search-page .hero { padding-top: 3rem !important; }' +
-          '.header-search-btn, .settings-feedback-submit, .settings-signout { background: #71935d !important; border: none !important; border-radius: 14px !important; color: #fff !important; }' +
-          '.store-badge { background: #0f2d1f !important; border-color: #0f2d1f !important; color: #fff !important; }' +
-          '.header-search-btn:hover, .istanbul-discovery-primary-button:hover { background: #5f7d4e !important; }' +
-          '.istanbul-pagination-button { background: #71935d !important; border: none !important; border-radius: 14px !important; color: #fff !important; }' +
-          '.istanbul-pagination-current { background: #45503f !important; border-color: #45503f !important; color: #fff !important; }' +
-          '.istanbul-results-mode { display: none !important; }' +
-          '.istanbul-favorite-button, .card-share-trigger { background: #fdf8f0 !important; border: none !important; color: #093826 !important; border-radius: 8px !important; font-size: 0.76rem !important; font-weight: 600 !important; padding: 0.25rem 0.55rem !important; }' +
-          '.venue-detail-action, .venue-detail-action-secondary, .venue-detail-action-inline { background: #fdf8f0 !important; border: none !important; color: #093826 !important; border-radius: 8px !important; font-size: 0.76rem !important; font-weight: 600 !important; padding: 0.25rem 0.55rem !important; }' +
-          '.venue-detail-chip { background: #fdf8f0 !important; border: none !important; border-radius: 8px !important; color: #093826 !important; font-size: 0.76rem !important; font-weight: 600 !important; padding: 0.25rem 0.55rem !important; }' +
-          '#favoritesTitle { color: #ffffff !important; }' +
-          '.istanbul-results-head h2 { color: #ffffff !important; }' +
-          '.kesfet-category-dropdown-options { gap: 0 !important; padding: 0 !important; margin: 0 !important; }' +
-          '.kesfet-category-dropdown-options .istanbul-filter-chip, .kesfet-category-dropdown-options .istanbul-mvp-subcategory-box { border-radius: 0 !important; border: none !important; border-bottom: 1px solid rgba(164,179,181,0.35) !important; background: transparent !important; padding: 0.56rem 0.65rem !important; transition: background 0.15s ease !important; }' +
-          '.kesfet-category-dropdown-options .istanbul-filter-chip:last-child, .kesfet-category-dropdown-options .istanbul-mvp-subcategory-box:last-child { border-bottom: none !important; }' +
-          '.kesfet-category-dropdown-options .istanbul-mvp-subcategory-box.is-active { background: rgba(9,56,38,0.08) !important; color: #093826 !important; font-weight: 500 !important; }' +
-          '.istanbul-filter-location-box, .istanbul-filter-section-box { background: #4b3123 !important; box-shadow: 0 3px 8px rgba(75,49,35,0.3) !important; color: #fdf8f0 !important; }' +
-          '.istanbul-filter-location-box-title, .istanbul-filter-section-box-title, .istanbul-filter-field > span:first-child, .istanbul-filter-yeme-icme-budget-nest-label { color: #fdf8f0 !important; }' +
-          '.istanbul-venue-card, .istanbul-venue-card-inner, .istanbul-filter-card, .istanbul-filter-section-box, .istanbul-filter-location-box, .content-guide, .venue-detail-main-card, .venue-detail-side-card, .venue-detail-media, .venue-detail-info, .venue-detail-reviews, .venue-detail-review-form, .top-city-card, .category-home-card, .settings-card, .settings-panel-card, .settings-sidebar-card, .istanbul-map-card, .istanbul-map-frame-wrap, .featured-venues-section, .featured-venues-panel, .featured-venues-grid, .home-lezzet-banner-inner { border: none !important; }';
-        document.head.appendChild(style);
-      }
-
-      // Force district dropdown button visibility via inline styles
-      // Use retry + MutationObserver because buttons may not exist yet when onPageFinished fires
-      (function fixDropdownButtons() {
-        function applyFix() {
-          var btns = document.querySelectorAll('.kesfet-category-dropdown-btn');
-          if (!btns.length) return false;
-          for (var i = 0; i < btns.length; i++) {
-            var b = btns[i];
-            if (b.dataset.appFixed) continue;
-            b.dataset.appFixed = '1';
-            b.style.setProperty('display', 'flex', 'important');
-            b.style.setProperty('background', '#ffffff', 'important');
-            b.style.setProperty('color', '#011d36', 'important');
-            b.style.setProperty('border', '1px solid rgba(164,179,181,0.82)', 'important');
-            b.style.setProperty('border-radius', '6px', 'important');
-            b.style.setProperty('padding', '0.5rem 0.65rem', 'important');
-            b.style.setProperty('width', '100%', 'important');
-            b.style.setProperty('justify-content', 'space-between', 'important');
-            b.style.setProperty('align-items', 'center', 'important');
-            b.style.setProperty('font-size', '0.84rem', 'important');
-            b.style.setProperty('box-sizing', 'border-box', 'important');
-            b.style.setProperty('cursor', 'pointer', 'important');
-            b.style.setProperty('min-height', '2.1rem', 'important');
-          }
-          return true;
-        }
-        // Try immediately
-        applyFix();
-        // Retry every 300ms for up to 5 seconds
-        var attempts = 0;
-        var timer = setInterval(function() {
-          attempts++;
-          applyFix();
-          if (attempts >= 16) clearInterval(timer);
-        }, 300);
-        // Also use MutationObserver for dynamic elements
-        if (window.MutationObserver) {
-          var obs = new MutationObserver(function() { applyFix(); });
-          obs.observe(document.body || document.documentElement, { childList: true, subtree: true });
-          setTimeout(function() { obs.disconnect(); }, 8000);
-        }
-      })();
-
-      // Pagination: scroll to first card when page changes
-      var paginationNav = document.getElementById('pagination');
-      if (paginationNav && !paginationNav.dataset.scrollBound) {
-        paginationNav.dataset.scrollBound = '1';
-        paginationNav.addEventListener('click', function() {
-          setTimeout(function() {
-            var firstCard = document.querySelector('.istanbul-venue-card');
-            if (firstCard) { firstCard.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-          }, 300);
-        });
-      }
-
-      // Hide signin icon + 4-column grid
-      if (!document.getElementById('aramabul-app-nav-css')) {
-        var navStyle = document.createElement('style');
-        navStyle.id = 'aramabul-app-nav-css';
-        navStyle.textContent = 
-          '.mobile-bottom-nav-btn[data-mobile-nav="signin"] { display: none !important; }' +
-          '.mobile-bottom-nav-actions { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }';
-        document.head.appendChild(navStyle);
-      }
-
-      // Keep Android footer order as: home, search, favorites, profile.
-      var mobileNav = document.querySelector('.mobile-bottom-nav-actions');
-      if (mobileNav) {
-        var searchBtn = mobileNav.querySelector('[data-mobile-nav="search"]');
-        var favoritesBtn = mobileNav.querySelector('[data-mobile-nav="favorites"]');
-        if (searchBtn && favoritesBtn && (searchBtn.compareDocumentPosition(favoritesBtn) & Node.DOCUMENT_POSITION_PRECEDING)) {
-          mobileNav.insertBefore(searchBtn, favoritesBtn);
-        }
-        // Replace footer nav PNG icons with custom SVGs
-        mobileNav.querySelectorAll('.mobile-bottom-nav-btn').forEach(function(btn) {
-          var type = btn.getAttribute('data-mobile-nav') || btn.dataset.mobileNav;
-          var img = btn.querySelector('.mobile-bottom-nav-icon-img');
-          var chip = btn.querySelector('.mobile-bottom-nav-chip');
-          if (img) {
-            if (type === 'home') { img.src = 'assets/ev.svg'; }
-            else if (type === 'favorites') { img.src = 'assets/fav.svg'; }
-            else if (type === 'profile') { img.src = 'assets/ayar.svg'; }
-            img.style.display = 'block';
-            img.style.width = '22px';
-            img.style.height = '22px';
-          }
-          if (type === 'home' || type === 'favorites' || type === 'profile') {
-            if (chip) { chip.classList.remove('icon-load-failed'); }
-            var svg = btn.querySelector('.mobile-bottom-nav-icon-svg');
-            if (svg) { svg.style.display = 'none'; }
-          }
-          // Active icon styling
-          if (btn.classList.contains('active')) {
-            if (chip) { chip.style.filter = 'none'; }
-            if (img) { img.style.filter = 'brightness(1.5)'; }
-            var label = btn.querySelector('.mobile-bottom-nav-label');
-            if (label) { label.style.color = '#a8d5a2'; }
-          }
-        });
-      }
-
-      // Favorites page: rename title with observer for dynamic content
-      var favTitle = document.getElementById('favoritesTitle');
-      if (favTitle) {
-        function fixFavTitle() {
-          if (favTitle.textContent.indexOf('Kaydet') !== -1) {
-            favTitle.textContent = 'Favorilerim';
-          }
-        }
-        fixFavTitle();
-        var favObs = new MutationObserver(fixFavTitle);
-        favObs.observe(favTitle, { childList: true, characterData: true, subtree: true });
-      }
-
-      // Hide header language switch (not the filter dropdowns which also use lang-switch class)
-      var langSwitch = document.querySelector('.global-topbar .lang-switch, .desktop-auth-links .lang-switch, [data-lang-switch]');
-      if (langSwitch) { langSwitch.style.display = 'none'; }
-
-      // Apply app language to website
-      var appLang = '$_globalAppLanguage';
-      if (appLang && appLang !== 'TR') {
-        window.ARAMABUL_CURRENT_LANGUAGE = appLang;
-        // Click the matching lang option to trigger native site translation
-        var langBtn = document.querySelector('[data-lang-option="' + appLang + '"]');
-        if (langBtn && !document.body.dataset.appLangApplied) {
-          document.body.dataset.appLangApplied = '1';
-          langBtn.click();
-        }
-      }
-
-      // Color the "arama" part of brand wordmark
-      var wm = document.querySelector('.brand-wordmark');
-      if (wm && !wm.dataset.colored) {
-        wm.dataset.colored = '1';
-        wm.innerHTML = '<span style=\"color:#e8f0e8\">arama</span><span style=\"color:#a8d5a2\">bul</span>';
-      }
-
-      // Simplify hero: change h1 + remove description paragraphs
-      var heroH1 = document.querySelector('.section-head h1, .province-head h1');
-      if (heroH1 && !heroH1.dataset.appModified) {
-        heroH1.dataset.appModified = '1';
-        heroH1.textContent = "İstanbul'u keşfet!";
-        // Hide all <p> siblings in the same container
-        var container = heroH1.parentElement;
-        if (container) {
-          container.querySelectorAll('p').forEach(function(p) { p.style.display = 'none'; });
-        }
-      }
-      // Settings: fix mobile panel visibility for sub-panels (password, feedback, etc.)
-      var params = new URLSearchParams(window.location.search);
-      var action = (params.get('action') || '').trim().toLowerCase();
-      if (action === 'password' || action === 'feedback' || action === 'help' || action === 'about') {
-        var panelStack = document.querySelector('.settings-panel-stack');
-        var sidebar = document.querySelector('.settings-sidebar-card');
-        if (panelStack) { panelStack.style.display = 'block'; }
-        if (sidebar) { sidebar.style.display = 'none'; }
-        // Ensure bottom nav buttons work on settings sub-pages
-        setTimeout(function() {
-          document.querySelectorAll('.mobile-bottom-nav-btn').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
-              var type = btn.getAttribute('data-mobile-nav') || btn.dataset.mobileNav;
-              if (type === 'home') { window.location.href = 'index.html'; }
-              else if (type === 'search') { window.location.href = 'search.html'; }
-              else if (type === 'favorites') { window.location.href = 'favorites.html'; }
-              else if (type === 'profile') { window.location.href = 'profile.html?action=profile'; }
-            });
-          });
-        }, 500);
-      }
-    ''');
-  }
-
-  // ---------------------------------------------------------------------------
-  // Connectivity
-  // ---------------------------------------------------------------------------
-
-  late final StreamSubscription<List<ConnectivityResult>> _connectivitySub;
-
-  void _startConnectivityWatch() {
-    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
-      final offline = results.every((r) => r == ConnectivityResult.none);
-      if (!mounted) return;
-      if (offline != _isOffline) {
-        setState(() => _isOffline = offline);
-        if (!offline && _lastError != null) {
-          _reload();
-        }
-      }
-    });
-  }
-
-  Future<bool> _checkConnectivity() async {
-    final results = await Connectivity().checkConnectivity();
-    return results.any((r) => r != ConnectivityResult.none);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
-
-  @override
-  void initState() {
-    super.initState();
-
-    _startConnectivityWatch();
-    _loadBannerAd();
-    _loadInterstitialAd();
-
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onNavigationRequest: _onNavigationRequest,
-          onPageStarted: (_) {
-            if (!mounted) return;
-            setState(() {
-              _isLoading = true;
-              _lastError = null;
-              _isPageTransitioning = true;
-            });
-            // Early CSS injection to minimize flash of unstyled content
-            _injectAppFlag();
-          },
-          onPageFinished: (_) {
-            if (!mounted) return;
-            // Re-inject to ensure all styles are applied
-            _injectAppFlag();
-            // Track page navigations for interstitial ads
-            _pageNavigationCount++;
-            if (_pageNavigationCount > 1 && _pageNavigationCount % _interstitialInterval == 0) {
-              _showInterstitialAd();
-            }
-            // Small delay to let CSS paint before revealing
-            Future.delayed(const Duration(milliseconds: 150), () {
-              if (!mounted) return;
-              setState(() {
-                _isLoading = false;
-                _lastError = null;
-                _hasLoadedAtLeastOnce = true;
-                _isPageTransitioning = false;
-              });
-            });
-          },
-          onProgress: (value) {
-            if (!mounted) return;
-            setState(() => _progress = value);
-          },
-          onWebResourceError: (error) {
-            if (error.isForMainFrame != true) return;
-            if (_hasLoadedAtLeastOnce) return;
-            if (!mounted) return;
-            setState(() {
-              _lastError = error.description;
-              _isLoading = false;
-            });
-          },
-        ),
-      );
-
-    // JS bridge
-    _setupJsBridge();
-
-    _controller.setBackgroundColor(const Color(0xFF45503f));
-
-    final platformController = _controller.platform;
-    if (platformController is WebKitWebViewController) {
-      platformController.setAllowsBackForwardNavigationGestures(true);
-    }
-
-    _loadInitialPage();
-  }
-
-  // ---------------------------------------------------------------------------
-  // AdMob: Banner
-  // ---------------------------------------------------------------------------
-  void _loadBannerAd() {
-    _bannerAd = BannerAd(
-      adUnitId: _bannerAdUnitId,
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) {
-          if (!mounted) return;
-          setState(() => _isBannerReady = true);
-          debugPrint('[AdMob] Banner loaded');
-        },
-        onAdFailedToLoad: (ad, error) {
-          debugPrint('[AdMob] Banner failed: ${error.message}');
-          ad.dispose();
-          _bannerAd = null;
-          _isBannerReady = false;
-          // Retry after 60 seconds
-          Future.delayed(const Duration(seconds: 60), () {
-            if (mounted) _loadBannerAd();
-          });
-        },
-      ),
-    )..load();
-  }
-
-  // ---------------------------------------------------------------------------
-  // AdMob: Interstitial
-  // ---------------------------------------------------------------------------
-  void _loadInterstitialAd() {
-    InterstitialAd.load(
-      adUnitId: _interstitialAdUnitId,
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _interstitialAd = ad;
-          debugPrint('[AdMob] Interstitial loaded');
-        },
-        onAdFailedToLoad: (error) {
-          debugPrint('[AdMob] Interstitial failed: ${error.message}');
-          _interstitialAd = null;
-          // Retry after 60 seconds
-          Future.delayed(const Duration(seconds: 60), () {
-            if (mounted) _loadInterstitialAd();
-          });
-        },
-      ),
-    );
-  }
-
-  void _showInterstitialAd() {
-    if (_interstitialAd == null) return;
-    _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
-      onAdDismissedFullScreenContent: (ad) {
-        ad.dispose();
-        _loadInterstitialAd(); // Pre-load next one
-      },
-      onAdFailedToShowFullScreenContent: (ad, error) {
-        debugPrint('[AdMob] Interstitial show failed: ${error.message}');
-        ad.dispose();
-        _loadInterstitialAd();
-      },
-    );
-    _interstitialAd!.show();
-    _interstitialAd = null;
-  }
-
-  @override
-  void dispose() {
-    _connectivitySub.cancel();
-    _bannerAd?.dispose();
-    _interstitialAd?.dispose();
-    super.dispose();
-  }
-
-  /// Smart loading: try live URL first, fall back to bundled assets if offline.
-  Future<void> _loadInitialPage() async {
-    try {
-      final online = await _checkConnectivity();
-      if (online) {
-        final path = widget.initialPath ?? '';
-        final url = path.isNotEmpty ? '$kLiveUrl$path' : kLiveUrl;
-        await _controller.loadRequest(Uri.parse(url));
-      } else {
-        await _loadBundledPage();
-      }
-    } catch (error) {
-      if (!mounted) return;
-      // If live URL fails, try bundled fallback.
-      try {
-        await _loadBundledPage();
-      } catch (e2) {
-        if (!mounted) return;
-        setState(() {
-          _isLoading = false;
-          _lastError = e2.toString();
-        });
-      }
-    }
-  }
-
-  Future<void> _loadBundledPage() async {
-    await _controller.loadFlutterAsset(kBundledEntryAssetPath);
-  }
-
-  Future<void> _reload() async {
-    setState(() {
-      _isLoading = true;
-      _lastError = null;
-    });
-    try {
-      final online = await _checkConnectivity();
-      if (online && !_hasLoadedAtLeastOnce) {
-        await _controller.loadRequest(Uri.parse(kLiveUrl));
-      } else if (_hasLoadedAtLeastOnce) {
-        await _controller.reload();
-      } else {
-        await _loadBundledPage();
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-        _lastError = e.toString();
-      });
-    }
-  }
-
-  Future<bool> _onBackPressed() async {
-    if (await _controller.canGoBack()) {
-      await _controller.goBack();
-      return false;
-    }
-    return true;
-  }
-
-  // ---------------------------------------------------------------------------
-  // UI
-  // ---------------------------------------------------------------------------
-
-  @override
-  Widget build(BuildContext context) {
-    final showProgress = _isLoading && _progress < 100;
-
-    // Match status bar to the web header color
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Color(0xFF45503f),
-      statusBarIconBrightness: Brightness.dark,
-    ));
-
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        final shouldPop = await _onBackPressed();
-        if (shouldPop && context.mounted) {
-          SystemNavigator.pop();
-        }
-      },
-      child: Scaffold(
-        backgroundColor: const Color(0xFF45503f),
-        body: Column(
-          children: [
-            // Status bar safe padding with matching color
-            Container(
-              color: const Color(0xFF45503f),
-              height: MediaQuery.of(context).padding.top,
-            ),
-            if (_isOffline)
-              Container(
-                width: double.infinity,
-                color: Colors.orange.shade800,
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: const Text(
-                  'İnternet bağlantısı yok',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            if (showProgress)
-              LinearProgressIndicator(
-                value: _progress / 100,
-                color: const Color(0xFF2d6b3f),
-                backgroundColor: const Color(0xFF45503f),
-              ),
-            Expanded(
-              child: Stack(
-                children: [
-                  WebViewWidget(controller: _controller),
-                  if (_lastError != null) _buildErrorOverlay(),
-                  // Theme overlay to prevent flash of unstyled content
-                  if (_isPageTransitioning || !_hasLoadedAtLeastOnce)
-                    Positioned.fill(
-                      child: AnimatedOpacity(
-                        opacity: (_isPageTransitioning || !_hasLoadedAtLeastOnce) ? 1.0 : 0.0,
-                        duration: const Duration(milliseconds: 250),
-                        child: Container(
-                          color: const Color(0xFF45503f),
-                          child: !_hasLoadedAtLeastOnce
-                            ? Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Image.asset(
-                                      'assets/logoNew.png',
-                                      width: 80,
-                                      height: 80,
-                                    ),
-                                    const SizedBox(height: 16),
-                                    const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.5,
-                                        color: Color(0xFFa8d5a2),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              )
-                            : null,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            // AdMob Banner Ad
-            if (_isBannerReady && _bannerAd != null)
-              Container(
-                color: const Color(0xFF45503f),
-                width: double.infinity,
-                height: _bannerAd!.size.height.toDouble(),
-                child: AdWidget(ad: _bannerAd!),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildErrorOverlay() {
-    return Container(
-      color: const Color(0xFF45503f),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Card(
-            elevation: 4,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _isOffline
-                        ? Icons.wifi_off_rounded
-                        : Icons.error_outline_rounded,
-                    size: 56,
-                    color: _isOffline
-                        ? Colors.orange.shade700
-                        : Colors.red.shade400,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _isOffline ? 'Bağlantı Kesildi' : 'Sayfa Yüklenemedi',
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _isOffline
-                        ? 'İnternet bağlantınızı kontrol edin.\nBağlantı sağlandığında otomatik yüklenecektir.'
-                        : _lastError ?? 'Bilinmeyen hata',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton.icon(
-                    onPressed: _reload,
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('Tekrar Dene'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF2d6b3f),
-                      minimumSize: const Size(180, 48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'AramaBul — Mekan Keşfet',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ),
       ),
     );

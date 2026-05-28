@@ -1,8 +1,8 @@
 name: aramabul_ios
-description: "AramaBul – Turkey venue discovery app. Flutter WebView shell (iOS)."
+description: "AramaBul – Turkey venue discovery app. Fully native Flutter (iOS)."
 publish_to: 'none'
 
-version: 1.0.1+12
+version: 1.0.1+17
 
 environment:
   sdk: ^3.11.5
@@ -11,8 +11,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  webview_flutter: ^4.13.1
-  webview_flutter_wkwebview: ^3.16.0
+
   url_launcher: ^6.3.2
   permission_handler: ^11.3.1
   connectivity_plus: ^6.1.4
@@ -25,6 +24,7 @@ dependencies:
   geolocator: ^13.0.2
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
+  app_tracking_transparency: ^2.0.6
 
 dev_dependencies:
   flutter_test:
@@ -34,6 +34,8 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/app_web/
+
     - assets/welcome/
     - assets/logoNew.png
+    - assets/cuzdan.png
+    - assets/uzak.png

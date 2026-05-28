@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../models/venue.dart';
 import '../services/venue_service.dart';
@@ -22,17 +23,65 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
   late Venue _venue;
   bool _isFavorite = false;
 
+  // Similar venues
+  List<Venue> _similarVenues = [];
+  bool _loadingSimilar = true;
+
+  // User position
+  Position? _currentPosition;
+
   @override
   void initState() {
     super.initState();
     _venue = widget.venue;
     _checkFavorite();
+    _loadSimilarVenues();
+    _getPosition();
+  }
+
+  Future<void> _getPosition() async {
+    try {
+      _currentPosition = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.medium, timeLimit: Duration(seconds: 5)),
+      );
+      if (mounted) setState(() {});
+    } catch (_) {}
   }
 
   Future<void> _checkFavorite() async {
     final isFav = await VenueService.isFavorite(_venue.id);
     if (!mounted) return;
     setState(() => _isFavorite = isFav);
+  }
+
+  Future<void> _loadSimilarVenues() async {
+    try {
+      final results = await VenueService.searchVenues(
+        query: _venue.category,
+        category: _venue.category,
+        district: _venue.district,
+        limit: 20,
+      );
+      if (!mounted) return;
+      // Filter out the current venue
+      var filtered = results.where((v) => v.id != _venue.id).toList();
+      // Client-side district filtering (API may not support district param)
+      if (_venue.district != null && _venue.district!.isNotEmpty) {
+        final sameDistrict = filtered
+            .where((v) => v.district?.toLowerCase() == _venue.district!.toLowerCase())
+            .toList();
+        if (sameDistrict.isNotEmpty) {
+          filtered = sameDistrict;
+        }
+      }
+      setState(() {
+        _similarVenues = filtered.take(5).toList();
+        _loadingSimilar = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _loadingSimilar = false);
+    }
   }
 
   Future<void> _toggleFavorite() async {
@@ -47,21 +96,78 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
               ? '${_venue.name} favorilere eklendi'
               : '${_venue.name} favorilerden kaldırıldı',
         ),
-        backgroundColor: const Color(0xFF2d6b3f),
+        backgroundColor: const Color(0xFF094174),
         duration: const Duration(seconds: 2),
       ),
     );
   }
 
   void _openDirections() {
-    if (_venue.latitude != null && _venue.longitude != null) {
-      final url =
-          'https://maps.apple.com/?daddr=${_venue.latitude},${_venue.longitude}';
-      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    } else if (_venue.mapsUrl != null && _venue.mapsUrl!.isNotEmpty) {
-      launchUrl(Uri.parse(_venue.mapsUrl!),
-          mode: LaunchMode.externalApplication);
+    if (_venue.latitude == null || _venue.longitude == null) {
+      if (_venue.mapsUrl != null && _venue.mapsUrl!.isNotEmpty) {
+        launchUrl(Uri.parse(_venue.mapsUrl!),
+            mode: LaunchMode.externalApplication);
+      }
+      return;
     }
+    final lat = _venue.latitude!;
+    final lng = _venue.longitude!;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0d2137),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Yol Tarifi',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                  )),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.map_rounded, color: Colors.white),
+                title: const Text('Apple Haritalar',
+                    style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  launchUrl(
+                    Uri.parse('https://maps.apple.com/?daddr=$lat,$lng'),
+                    mode: LaunchMode.externalApplication,
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.directions_rounded, color: Colors.white),
+                title: const Text('Google Maps',
+                    style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  launchUrl(
+                    Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'),
+                    mode: LaunchMode.externalApplication,
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _callVenue() {
@@ -85,17 +191,25 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
     Share.share('${_venue.name} — $url');
   }
 
+  void _navigateToVenue(Venue venue) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => VenueDetailScreen(venue: venue),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF45503f),
+      backgroundColor: const Color(0xFF094174),
       body: CustomScrollView(
         slivers: [
-          // Hero app bar with image
+          // Hero app bar with image — 280px height with gradient overlay
           SliverAppBar(
-            expandedHeight: 260,
+            expandedHeight: 280,
             pinned: true,
-            backgroundColor: const Color(0xFF2d6b3f),
+            backgroundColor: const Color(0xFF094174),
             foregroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
               background: _venue.imageUrl != null && _venue.imageUrl!.isNotEmpty
@@ -103,10 +217,10 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                       fit: StackFit.expand,
                       children: [
                         Image.network(
-                          _venue.imageUrl!,
+                          _resolveImageUrl(_venue.imageUrl!),
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
-                            color: const Color(0xFF2d6b3f),
+                            color: const Color(0xFF094174),
                             child: const Icon(
                               Icons.place_rounded,
                               color: Colors.white38,
@@ -114,24 +228,26 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                             ),
                           ),
                         ),
-                        // Gradient overlay
+                        // Multi-stop gradient for better text readability
                         const DecoratedBox(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
+                                Color(0x66000000),
                                 Colors.transparent,
-                                Color(0xCC000000),
+                                Color(0x33000000),
+                                Color(0xDD000000),
                               ],
-                              stops: [0.5, 1.0],
+                              stops: [0.0, 0.25, 0.6, 1.0],
                             ),
                           ),
                         ),
                       ],
                     )
                   : Container(
-                      color: const Color(0xFF2d6b3f),
+                      color: const Color(0xFF094174),
                       child: const Icon(
                         Icons.place_rounded,
                         color: Colors.white38,
@@ -174,90 +290,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                       color: Colors.white,
                     ),
                   ),
-                  const SizedBox(height: 8),
-
-                  // Category badge
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2d6b3f),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          _venue.category,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      if (_venue.subcategory != null &&
-                          _venue.subcategory!.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            _venue.subcategory!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white.withValues(alpha: 0.8),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
                   const SizedBox(height: 16),
-
-                  // Rating
-                  if (_venue.rating != null) ...[
-                    _buildInfoCard(
-                      child: Row(
-                        children: [
-                          ...List.generate(5, (i) {
-                            final filled = i < (_venue.rating ?? 0).round();
-                            return Icon(
-                              filled
-                                  ? Icons.star_rounded
-                                  : Icons.star_border_rounded,
-                              color: const Color(0xFFf59e0b),
-                              size: 24,
-                            );
-                          }),
-                          const SizedBox(width: 8),
-                          Text(
-                            _venue.rating!.toStringAsFixed(1),
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1a1a1a),
-                            ),
-                          ),
-                          if (_venue.reviewCount != null) ...[
-                            const SizedBox(width: 8),
-                            Text(
-                              '(${_venue.reviewCount} değerlendirme)',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: const Color(0xFF1a1a1a)
-                                    .withValues(alpha: 0.5),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
 
                   // Quick actions
                   _buildQuickActions(),
@@ -265,10 +298,14 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
 
                   // Details card
                   _buildDetailsCard(),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-                  // Open in web button
-                  _buildOpenInWebButton(),
+                  // Tag chips (category, distance, rating)
+                  _buildTagChips(),
+                  const SizedBox(height: 24),
+
+                  // Similar venues
+                  _buildSimilarVenues(),
                   const SizedBox(height: 40),
                 ],
               ),
@@ -284,7 +321,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFd5e8d3),
+        color: const Color(0xFFbdd8e9),
         borderRadius: BorderRadius.circular(14),
       ),
       child: child,
@@ -387,7 +424,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFd5e8d3),
+        color: const Color(0xFFbdd8e9),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -408,7 +445,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(detail.icon,
-                        size: 20, color: const Color(0xFF2d6b3f)),
+                        size: 20, color: const Color(0xFF094174)),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -442,27 +479,176 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
     );
   }
 
-  Widget _buildOpenInWebButton() {
-    final slug = _venue.slug ?? '';
-    if (slug.isEmpty) return const SizedBox.shrink();
 
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: () {
-          final url = 'https://aramabul.com/mekan/$slug';
-          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-        },
-        icon: const Icon(Icons.open_in_browser_rounded, size: 18),
-        label: const Text('Detayları Web\'de Görüntüle'),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.white,
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+
+
+  String _resolveImageUrl(String url) {
+    if (url.startsWith('http')) return url;
+    return 'https://aramabul.com$url';
+  }
+
+  String _calcDistance() {
+    if (_currentPosition == null || _venue.latitude == null || _venue.longitude == null) return '';
+    final d = Geolocator.distanceBetween(
+      _currentPosition!.latitude, _currentPosition!.longitude,
+      _venue.latitude!, _venue.longitude!,
+    );
+    if (d > 100000) return ''; // 100km+ = user is outside Istanbul
+    if (d < 1000) return '${d.toStringAsFixed(0)} m';
+    return '${(d / 1000).toStringAsFixed(1)} km';
+  }
+
+  Widget _buildTagChips() {
+    final dist = _calcDistance();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Row 1: İlçe, Mahalle, Kategori (plain text)
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            if (_venue.district != null && _venue.district!.isNotEmpty)
+              _chip(_venue.district!),
+            if (_venue.neighborhood != null && _venue.neighborhood!.isNotEmpty)
+              _chip(_venue.neighborhood!),
+            _chip(_venue.category),
+          ],
         ),
+        const SizedBox(height: 6),
+        // Row 2: Bütçe, Mesafe, Değerlendirme (with icons)
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            _chipImage('assets/cuzdan.png', _budgetLabel()),
+            if (dist.isNotEmpty)
+              _chipImage('assets/uzak.png', dist),
+            if (_venue.rating != null)
+              _chipIcon(
+                Icons.star_rounded,
+                '${_venue.rating!.toStringAsFixed(1)}${_venue.reviewCount != null ? ' (${_formatCount(_venue.reviewCount!)})' : ''}',
+                iconColor: const Color(0xFF093826),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _budgetLabel() {
+    switch (_venue.budget) {
+      case 'low': return 'Uygun';
+      case 'mid': return 'Makul';
+      case 'high': return 'Yüksek';
+      default: return 'Makul';
+    }
+  }
+
+  String _formatCount(int n) => n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}B' : n.toString();
+
+  Widget _chip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDF8F0),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF7bbce8), width: 1),
       ),
+      child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF093826))),
+    );
+  }
+
+  Widget _chipIcon(IconData icon, String label, {Color? iconColor}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDF8F0),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF7bbce8), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: iconColor ?? const Color(0xFF093826)),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF093826))),
+        ],
+      ),
+    );
+  }
+
+  Widget _chipImage(String assetPath, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFDF8F0),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF7bbce8), width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(assetPath, width: 16, height: 16),
+          const SizedBox(width: 5),
+          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF093826))),
+        ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Benzer Mekanlar — similar venues horizontal scroll section
+  // ---------------------------------------------------------------------------
+
+  Widget _buildSimilarVenues() {
+    // Don't render section header until loading is done and there are results
+    if (_loadingSimilar) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 20),
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: Color(0xFF7bbce8),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_similarVenues.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Benzer Mekanlar',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 190,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: _similarVenues.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final venue = _similarVenues[index];
+              return _SimilarVenueCard(
+                venue: venue,
+                onTap: () => _navigateToVenue(venue),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -470,6 +656,92 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
 // ---------------------------------------------------------------------------
 // Helper widgets
 // ---------------------------------------------------------------------------
+
+class _SimilarVenueCard extends StatelessWidget {
+  final Venue venue;
+  final VoidCallback onTap;
+
+  const _SimilarVenueCard({
+    required this.venue,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 160,
+        decoration: BoxDecoration(
+          color: const Color(0xFFbdd8e9),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Venue image
+            SizedBox(
+              height: 100,
+              width: double.infinity,
+              child: venue.imageUrl != null && venue.imageUrl!.isNotEmpty
+                  ? Image.network(
+                      venue.imageUrl!.startsWith('http') ? venue.imageUrl! : 'https://aramabul.com${venue.imageUrl!}',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: const Color(0xFF094174),
+                        child: const Icon(Icons.place_rounded, color: Colors.white38, size: 36),
+                      ),
+                    )
+                  : Container(
+                      color: const Color(0xFF094174),
+                      child: const Icon(Icons.place_rounded, color: Colors.white38, size: 36),
+                    ),
+            ),
+            // Venue info
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      venue.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0a3d6b)),
+                    ),
+                    const SizedBox(height: 2),
+                    if (venue.district != null || venue.neighborhood != null)
+                      Text(
+                        [
+                          venue.district,
+                          if (venue.neighborhood != null && venue.neighborhood!.isNotEmpty)
+                            '${venue.neighborhood} Mah.',
+                        ].where((s) => s != null && s.isNotEmpty).join(', '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 10, color: const Color(0xFF0a3d6b).withValues(alpha: 0.6)),
+                      ),
+                    const Spacer(),
+                    if (venue.rating != null)
+                      Row(
+                        children: [
+                          const Icon(Icons.star_rounded, color: Color(0xFFf59e0b), size: 13),
+                          const SizedBox(width: 2),
+                          Text(venue.rating!.toStringAsFixed(1), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0a3d6b))),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _ActionButton extends StatelessWidget {
   final IconData icon;

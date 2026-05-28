@@ -16,6 +16,10 @@ class Venue {
   final int? reviewCount;
   final String? imageUrl;
   final String? slug;
+  final String? neighborhood;
+  final String? instagram;
+  final String? budget;
+  final String? editorialSummary;
   final bool isFavorite;
 
   const Venue({
@@ -35,6 +39,10 @@ class Venue {
     this.reviewCount,
     this.imageUrl,
     this.slug,
+    this.neighborhood,
+    this.instagram,
+    this.budget,
+    this.editorialSummary,
     this.isFavorite = false,
   });
 
@@ -55,9 +63,15 @@ class Venue {
       rating: _parseDouble(json['rating']),
       reviewCount: json['reviewCount'] is int
           ? json['reviewCount']
-          : int.tryParse('${json['reviewCount'] ?? json['review_count'] ?? ''}'),
-      imageUrl: json['imageUrl']?.toString() ?? json['image_url']?.toString(),
+          : json['userRatingCount'] is int
+              ? json['userRatingCount']
+              : int.tryParse('${json['reviewCount'] ?? json['review_count'] ?? json['userRatingCount'] ?? ''}'),
+      imageUrl: json['imageUrl']?.toString() ?? json['image_url']?.toString() ?? json['photoUri']?.toString(),
       slug: json['slug']?.toString(),
+      neighborhood: json['neighborhood']?.toString(),
+      instagram: json['instagram']?.toString(),
+      budget: json['budget']?.toString(),
+      editorialSummary: json['editorialSummary']?.toString(),
     );
   }
 
@@ -79,6 +93,10 @@ class Venue {
       reviewCount: reviewCount,
       imageUrl: imageUrl,
       slug: slug,
+      neighborhood: neighborhood,
+      instagram: instagram,
+      budget: budget,
+      editorialSummary: editorialSummary,
       isFavorite: isFavorite ?? this.isFavorite,
     );
   }
@@ -100,6 +118,10 @@ class Venue {
     'reviewCount': reviewCount,
     'imageUrl': imageUrl,
     'slug': slug,
+    'neighborhood': neighborhood,
+    'instagram': instagram,
+    'budget': budget,
+    'editorialSummary': editorialSummary,
   };
 
   static double? _parseDouble(dynamic v) {

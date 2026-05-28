@@ -1,16 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../models/venue.dart';
 import '../services/venue_service.dart';
-import 'search_screen.dart';
 import 'venue_detail_screen.dart';
+import 'lezzet_duraklari_screen.dart';
+import 'category_explore_screen.dart';
 
-/// Native explore screen — provides category browsing and nearby venue
-/// discovery without relying on WebView.
-/// This screen is the primary answer to Apple Guideline 4.2.2.
+// ─── Color constants (matching WebView CSS injection) ────────────────────
+const _kBg = Color(0xFF094174);       // body background
+const _kCardBg = Color(0xFFbdd8e9);   // venue card background
+const _kChipBg = Color(0xFFFDF8F0);   // tag chip background (cream)
+const _kChipBorder = Color(0xFF7bbce8); // tag chip border
+const _kCatBg = Color(0xFF48769f);    // category button bg
+const _kBtnDark = Color(0xFF011e3a);  // dark button bg
+const _kGuideBg = Color(0xFFd7d7d7);  // content guide bg
+const _kGuideHighlight = Color(0xFF7bbce8); // ustalara saygi bg
+
+/// Native explore screen — pixel-perfect match of the Android WebView version.
 class ExploreScreen extends StatefulWidget {
   const ExploreScreen({super.key});
 
@@ -19,527 +29,335 @@ class ExploreScreen extends StatefulWidget {
 }
 
 class _ExploreScreenState extends State<ExploreScreen> {
-  List<Venue> _nearbyVenues = [];
-  List<Venue> _popularVenues = [];
-  bool _isLoadingNearby = false;
-  bool _isLoadingPopular = true;
-  bool _locationGranted = false;
+  List<Venue> _venues = [];
+  bool _isLoading = true;
   Position? _currentPosition;
-  String _selectedCategory = '';
 
-  static const List<_CategoryItem> _categories = [
-    _CategoryItem('Restoran', Icons.restaurant_rounded, Color(0xFFe74c3c)),
-    _CategoryItem('Kafe', Icons.coffee_rounded, Color(0xFF8B4513)),
-    _CategoryItem('Bar', Icons.local_bar_rounded, Color(0xFF9b59b6)),
-    _CategoryItem('Otel', Icons.hotel_rounded, Color(0xFF2980b9)),
-    _CategoryItem('Gece Hayatı', Icons.nightlife_rounded, Color(0xFFe91e63)),
-    _CategoryItem('Müze', Icons.museum_rounded, Color(0xFF16a085)),
-    _CategoryItem('Alışveriş', Icons.shopping_bag_rounded, Color(0xFFf39c12)),
-    _CategoryItem('Spor', Icons.fitness_center_rounded, Color(0xFF27ae60)),
-    _CategoryItem('Sağlık', Icons.local_hospital_rounded, Color(0xFFe53935)),
-    _CategoryItem('Eğlence', Icons.attractions_rounded, Color(0xFFff6f00)),
-    _CategoryItem('Park', Icons.park_rounded, Color(0xFF2e7d32)),
-    _CategoryItem('Tümü', Icons.apps_rounded, Color(0xFF607d8b)),
+  // Top categories — exactly as shown in Android WebView
+  static const List<String> _categories = [
+    'Yeme-İçme', 'Gezi', 'Hizmetler',
+    'Sağlık', 'Kültür', 'Sanat',
   ];
 
   @override
   void initState() {
     super.initState();
-    _loadPopularVenues();
-    _checkLocationAndLoadNearby();
+    _loadVenues();
+    _getPosition();
   }
 
-  Future<void> _checkLocationAndLoadNearby() async {
-    final status = await Permission.locationWhenInUse.status;
-    if (status.isGranted) {
-      _locationGranted = true;
-      await _loadNearbyVenues();
-    } else if (status.isDenied) {
-      final result = await Permission.locationWhenInUse.request();
-      if (result.isGranted) {
-        _locationGranted = true;
-        await _loadNearbyVenues();
+  Future<void> _getPosition() async {
+    try {
+      final status = await Permission.locationWhenInUse.request();
+      if (status.isGranted) {
+        _currentPosition = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 8),
+          ),
+        );
+        // Reload venues with position for distance calculation
+        if (mounted && _venues.isNotEmpty) setState(() {});
       }
+    } catch (e) {
+      debugPrint('[Explore] Position error: $e');
     }
   }
 
-  Future<void> _loadNearbyVenues({String? category}) async {
-    if (!_locationGranted) return;
-    setState(() => _isLoadingNearby = true);
+  Future<void> _loadVenues() async {
+    setState(() => _isLoading = true);
     try {
-      _currentPosition = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 10),
-        ),
-      );
-      final venues = await VenueService.fetchNearbyVenues(
-        latitude: _currentPosition!.latitude,
-        longitude: _currentPosition!.longitude,
-        category: category,
-        limit: 20,
-      );
+      final venues = await VenueService.fetchFeaturedVenues(limit: 15);
       if (!mounted) return;
+      // Only venues with photos, shuffle and pick 3
+      final withPhoto = venues.where((v) => v.imageUrl != null && v.imageUrl!.isNotEmpty).toList();
+      withPhoto.shuffle();
+      final picked = withPhoto.take(3).toList();
       setState(() {
-        _nearbyVenues = venues.isNotEmpty ? venues : _filterFallback(category);
-        _isLoadingNearby = false;
+        _venues = picked.isNotEmpty ? picked : VenueService.fallbackVenues.take(3).toList();
+        _isLoading = false;
       });
     } catch (e) {
-      debugPrint('[Explore] Nearby error: $e');
       if (!mounted) return;
       setState(() {
-        _nearbyVenues = _filterFallback(category);
-        _isLoadingNearby = false;
+        _venues = VenueService.fallbackVenues;
+        _isLoading = false;
       });
     }
   }
 
-  List<Venue> _filterFallback(String? category) {
-    final all = VenueService.fallbackVenues;
-    if (category == null || category.isEmpty) return all;
-    return all.where((v) => v.category == category).toList();
-  }
-
-  Future<void> _loadPopularVenues() async {
-    setState(() => _isLoadingPopular = true);
-    try {
-      final venues = await VenueService.searchVenues(
-        query: 'istanbul',
-        limit: 10,
-      );
-      if (!mounted) return;
-      setState(() {
-        _popularVenues = venues.isNotEmpty ? venues : VenueService.fallbackVenues;
-        _isLoadingPopular = false;
-      });
-    } catch (e) {
-      debugPrint('[Explore] Popular error: $e');
-      if (!mounted) return;
-      setState(() {
-        _popularVenues = VenueService.fallbackVenues;
-        _isLoadingPopular = false;
-      });
-    }
-  }
-
-  void _onCategoryTap(_CategoryItem cat) {
+  void _onCategoryTap(String category) {
     HapticFeedback.selectionClick();
-    final catName = cat.label == 'Tümü' ? '' : cat.label;
-    setState(() => _selectedCategory = catName);
-    if (_locationGranted) {
-      _loadNearbyVenues(category: catName.isNotEmpty ? catName : null);
-    }
-  }
-
-  void _openVenueDetail(Venue venue) {
+    // Map display name to API key
+    final keyMap = {
+      'Yeme-İçme': 'yeme-icme',
+      'Gezi': 'gezi',
+      'Hizmetler': 'hizmetler',
+      'Sağlık': 'saglik',
+      'Kültür': 'kultur',
+      'Sanat': 'sanat',
+    };
+    final key = keyMap[category] ?? category.toLowerCase();
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => VenueDetailScreen(venue: venue),
+        builder: (_) => CategoryExploreScreen(
+          mainCategoryKey: key,
+          mainCategoryTitle: category,
+        ),
       ),
     );
   }
 
-  void _openSearch() {
+  void _openVenueDetail(Venue venue) {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const SearchScreen()),
+      MaterialPageRoute(builder: (_) => VenueDetailScreen(venue: venue)),
     );
   }
 
+  String _calcDistance(Venue v) {
+    if (_currentPosition == null || v.latitude == null || v.longitude == null) return '';
+    final d = Geolocator.distanceBetween(
+      _currentPosition!.latitude, _currentPosition!.longitude,
+      v.latitude!, v.longitude!,
+    );
+    if (d > 100000) return '';
+    if (d < 1000) return '${d.toStringAsFixed(0)} m';
+    return '${(d / 1000).toStringAsFixed(1)} km';
+  }
+
   Future<void> _onRefresh() async {
-    await Future.wait([
-      _loadPopularVenues(),
-      if (_locationGranted)
-        _loadNearbyVenues(
-          category: _selectedCategory.isNotEmpty ? _selectedCategory : null,
-        ),
-    ]);
+    await _loadVenues();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF45503f),
-      body: SafeArea(
-        child: RefreshIndicator(
-          color: const Color(0xFF2d6b3f),
-          onRefresh: _onRefresh,
-          child: CustomScrollView(
-            slivers: [
-              // Header + Search Bar
-              SliverToBoxAdapter(child: _buildHeader()),
+      backgroundColor: _kBg,
+      body: RefreshIndicator(
+        color: _kChipBorder,
+        onRefresh: _onRefresh,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+          children: [
+            // ── 1. Header ──
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  "İstanbul'u keşfet!",
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _onRefresh,
+                  child: Image.asset('assets/welcome/refresh.png', width: 22, height: 22),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
 
-              // Categories
-              SliverToBoxAdapter(child: _buildCategorySection()),
+            // ── 2. Category Grid (3x2) ──
+            _buildCategoryGrid(),
+            const SizedBox(height: 16),
 
-              // Nearby Venues
-              if (_locationGranted)
-                SliverToBoxAdapter(child: _buildNearbySection()),
+            // ── 3. Venue Cards ──
+            if (_isLoading)
+              ..._buildShimmerCards()
+            else
+              ..._venues.map((v) => _VenueCard(
+                venue: v,
+                distance: _calcDistance(v),
+                onTap: () => _openVenueDetail(v),
+              )),
 
-              // Popular / Featured Venues
-              SliverToBoxAdapter(child: _buildPopularSection()),
+            // ── 4. Content Guide: Ustalara Saygı ──
+            const SizedBox(height: 16),
+            _buildUstalaraSaygi(),
 
-              // Bottom padding
-              const SliverToBoxAdapter(child: SizedBox(height: 24)),
-            ],
-          ),
+            // ── 5. Content Guide: Platform Rehberi ──
+            const SizedBox(height: 14),
+            _buildPlatformGuide(),
+
+            const SizedBox(height: 32),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Brand + greeting
-          Row(
-            children: [
-              RichText(
-                text: const TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'arama',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF093827),
-                      ),
-                    ),
-                    TextSpan(
-                      text: 'bul',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              if (_locationGranted && _currentPosition != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.location_on_rounded, color: Colors.white, size: 14),
-                      SizedBox(width: 4),
-                      Text(
-                        'İstanbul',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'İstanbul\'u keşfet!',
-            style: TextStyle(
-              fontSize: 15,
-              color: Colors.white.withValues(alpha: 0.7),
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Search bar
-          GestureDetector(
-            onTap: _openSearch,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: const Color(0xFFd5e8d3),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search_rounded, color: Color(0xFF2d6b3f), size: 22),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Mekan, kategori veya ilçe ara...',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: const Color(0xFF1a1a1a).withValues(alpha: 0.45),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+  // ── Category Grid ──
+  Widget _buildCategoryGrid() {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        childAspectRatio: 2.8,
       ),
-    );
-  }
-
-  Widget _buildCategorySection() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Kategoriler',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
+      itemCount: _categories.length,
+      itemBuilder: (_, i) {
+        return GestureDetector(
+          onTap: () => _onCategoryTap(_categories[i]),
+          child: Container(
+            decoration: BoxDecoration(
+              color: _kCatBg,
+              borderRadius: BorderRadius.circular(8),
             ),
-          ),
-          const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.85,
-            ),
-            itemCount: _categories.length,
-            itemBuilder: (context, index) {
-              final cat = _categories[index];
-              final isSelected = (_selectedCategory == cat.label) ||
-                  (_selectedCategory.isEmpty && cat.label == 'Tümü');
-              return _CategoryCard(
-                item: cat,
-                isSelected: isSelected,
-                onTap: () => _onCategoryTap(cat),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNearbySection() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 24, 0, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                const Icon(Icons.near_me_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                const Text(
-                  'Yakınındaki Mekanlar',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const Spacer(),
-                if (_isLoadingNearby)
-                  const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (_nearbyVenues.isEmpty && !_isLoadingNearby)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _selectedCategory.isNotEmpty
-                      ? '$_selectedCategory kategorisinde yakınında mekan bulunamadı.'
-                      : 'Yakınında mekan bulunamadı.',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontSize: 14,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            )
-          else
-            SizedBox(
-              height: 220,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _nearbyVenues.length,
-                itemBuilder: (context, index) {
-                  return _VenueHorizontalCard(
-                    venue: _nearbyVenues[index],
-                    onTap: () => _openVenueDetail(_nearbyVenues[index]),
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPopularSection() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.trending_up_rounded, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                'Popüler Mekanlar',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              const Spacer(),
-              if (_isLoadingPopular)
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (_popularVenues.isEmpty && !_isLoadingPopular)
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
+            child: Center(
               child: Text(
-                'Mekanlar yükleniyor...',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.7),
-                  fontSize: 14,
+                _categories[i],
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
                 ),
                 textAlign: TextAlign.center,
               ),
-            )
-          else
-            ...List.generate(_popularVenues.length, (index) {
-              return _VenueListCard(
-                venue: _popularVenues[index],
-                index: index + 1,
-                onTap: () => _openVenueDetail(_popularVenues[index]),
-              );
-            }),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // ── Shimmer ──
+  List<Widget> _buildShimmerCards() {
+    return List.generate(3, (_) => Container(
+      height: 320,
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: _kCardBg.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(14),
+      ),
+    ));
+  }
+
+  // ── Ustalara Saygı ──
+  Widget _buildUstalaraSaygi() {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const LezzetDuraklariScreen()),
+      ),
+      child: Container(
+      decoration: BoxDecoration(
+        color: _kGuideHighlight,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Ustalara saygı!',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF1a1a1a),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Mehmet Yaşin ve Teoman Hünal — İstanbul Lezzet Durakları',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1a1a1a),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "İstanbul'un zengin mutfak kültürünü keşfetmek denildiğinde akla gelen ilk isimlerden ikisi, gastronomi yazarı Mehmet Yaşin ve The North Shield Pub zincirinin kurucusu, içki kültürü uzmanı Teoman Hünal'dır.",
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: const Color(0xFF1a1a1a).withValues(alpha: 0.8),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Lezzet Duraklarını AramaBul ile Keşfet!',
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1a1a1a),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.network(
+              'https://aramabul.com/assets/gorevimiz-yemek.jpg',
+              height: 180,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                height: 180,
+                color: _kCatBg,
+                child: const Center(child: Icon(Icons.image, size: 40, color: Colors.white54)),
+              ),
+            ),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  // ── Platform Guide ──
+  Widget _buildPlatformGuide() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _kGuideBg,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "İstanbul'da aradığın her şey burada!",
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF1a1a1a),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            "Aramabul, İstanbul'daki 29 binden fazla mekanı tek bir noktada toplayan yerel mekan keşif platformudur. Kategoriler, kullanıcı ihtiyacına göre; yeme-içme, gezi, hizmet, sağlık, kültür ve sanat başlıkları altında oluşturulmuştur.",
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 13,
+              height: 1.6,
+              color: const Color(0xFF1a1a1a).withValues(alpha: 0.8),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _guideItem('Yeme-İçme', "İstanbul'un her köşesindeki restoranlar, meyhaneler, kafeler ve pastaneler gibi mekanları keşfedin."),
+          _guideItem('Gezi', 'Oteller, butik oteller, pansiyonlar ve kamp alanları gibi seçenekleri inceleyin.'),
+          _guideItem('Hizmetler', 'Kuaför, veteriner ve akaryakıt istasyonları gibi günlük yaşam hizmet noktalarını bulun.'),
+          _guideItem('Sağlık', 'Hastaneler, aile sağlık merkezleri ve eczaneler gibi sağlık kuruluşlarına ulaşın.'),
+          _guideItem('Kültür', 'Müzeler, tarihi camiler, saraylar ve arkeolojik alanları keşfedin.'),
+          _guideItem('Sanat', 'Tiyatrolar, galeriler, konser salonları ve etkinlik mekanlarını listeleyin.'),
         ],
       ),
     );
   }
-}
 
-// ---------------------------------------------------------------------------
-// Category data model
-// ---------------------------------------------------------------------------
-
-class _CategoryItem {
-  final String label;
-  final IconData icon;
-  final Color color;
-  const _CategoryItem(this.label, this.icon, this.color);
-}
-
-// ---------------------------------------------------------------------------
-// Category card widget
-// ---------------------------------------------------------------------------
-
-class _CategoryCard extends StatelessWidget {
-  final _CategoryItem item;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _CategoryCard({
-    required this.item,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF2d6b3f)
-              : const Color(0xFFd5e8d3),
-          borderRadius: BorderRadius.circular(14),
-          border: isSelected
-              ? Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2)
-              : null,
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF2d6b3f).withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+  Widget _guideItem(String title, String desc) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          style: GoogleFonts.plusJakartaSans(fontSize: 13, height: 1.5, color: const Color(0xFF1a1a1a).withValues(alpha: 0.8)),
           children: [
-            Icon(
-              item.icon,
-              size: 28,
-              color: isSelected ? Colors.white : item.color,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              item.label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected
-                    ? Colors.white
-                    : const Color(0xFF1a1a1a),
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            TextSpan(text: '$title ', style: const TextStyle(fontWeight: FontWeight.w700)),
+            TextSpan(text: desc),
           ],
         ),
       ),
@@ -547,119 +365,87 @@ class _CategoryCard extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Horizontal venue card (for nearby section)
-// ---------------------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════════
+// Venue Card — exact match of Android WebView design
+// ═══════════════════════════════════════════════════════════════════════════
 
-class _VenueHorizontalCard extends StatelessWidget {
+class _VenueCard extends StatelessWidget {
   final Venue venue;
+  final String distance;
   final VoidCallback onTap;
-
-  const _VenueHorizontalCard({
-    required this.venue,
-    required this.onTap,
-  });
+  const _VenueCard({required this.venue, required this.distance, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 180,
-        margin: const EdgeInsets.only(right: 12),
+        margin: const EdgeInsets.only(bottom: 14),
         decoration: BoxDecoration(
-          color: const Color(0xFFd5e8d3),
+          color: _kCardBg,
           borderRadius: BorderRadius.circular(14),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
+            // ── Photo ──
             SizedBox(
-              height: 110,
+              height: 200,
               width: double.infinity,
-              child: venue.imageUrl != null && venue.imageUrl!.isNotEmpty
-                  ? Image.network(
-                      venue.imageUrl!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: const Color(0xFF45503f).withValues(alpha: 0.3),
-                        child: const Icon(
-                          Icons.place_rounded,
-                          color: Color(0xFF2d6b3f),
-                          size: 40,
-                        ),
-                      ),
-                    )
-                  : Container(
-                      color: const Color(0xFF45503f).withValues(alpha: 0.3),
-                      child: const Icon(
-                        Icons.place_rounded,
-                        color: Color(0xFF2d6b3f),
-                        size: 40,
-                      ),
-                    ),
+              child: _buildImage(),
             ),
-            // Info
+
+            // ── Venue Name ──
             Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+              child: Text(
+                venue.name,
+                style: GoogleFonts.plusJakartaSans(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF1a1a1a),
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+
+            // ── Tag chips row (district, neighborhood, category) ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
                 children: [
-                  Text(
-                    venue.name,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1a1a1a),
+                  if (venue.district != null && venue.district!.isNotEmpty)
+                    _TagChip(venue.district!),
+                  if (venue.subcategory != null && venue.subcategory!.isNotEmpty)
+                    _TagChip(venue.subcategory!),
+                  _TagChip(venue.category),
+                ],
+              ),
+            ),
+
+            // ── Bottom info row (budget, distance, rating) ──
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  // Budget chip
+                  _InfoImageChip(assetPath: 'assets/cuzdan.png', label: _budgetLabel(venue)),
+                  // Distance chip
+                  if (distance.isNotEmpty)
+                    _InfoImageChip(assetPath: 'assets/uzak.png', label: distance),
+                  // Rating chip
+                  if (venue.rating != null)
+                    _InfoChip(
+                      icon: Icons.star_rounded,
+                      iconColor: const Color(0xFF093826),
+                      label: '${venue.rating!.toStringAsFixed(1)}${venue.reviewCount != null ? ' (${_formatCount(venue.reviewCount!)})' : ''}',
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  if (venue.district != null)
-                    Text(
-                      venue.district!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: const Color(0xFF1a1a1a).withValues(alpha: 0.5),
-                      ),
-                      maxLines: 1,
-                    ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      if (venue.rating != null) ...[
-                        const Icon(Icons.star_rounded, size: 14, color: Color(0xFFf59e0b)),
-                        const SizedBox(width: 3),
-                        Text(
-                          venue.rating!.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1a1a1a),
-                          ),
-                        ),
-                      ],
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2d6b3f).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          venue.category,
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w500,
-                            color: Color(0xFF2d6b3f),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -668,132 +454,244 @@ class _VenueHorizontalCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildImage() {
+    String? url;
+    if (venue.imageUrl != null && venue.imageUrl!.isNotEmpty) {
+      url = venue.imageUrl!.startsWith('http') ? venue.imageUrl! : 'https://aramabul.com${venue.imageUrl!}';
+    } else if (venue.slug != null && venue.slug!.isNotEmpty) {
+      url = 'https://aramabul.com/venue-photos/${venue.slug}.jpg';
+    }
+
+    if (url != null) {
+      return Image.network(
+        url,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _imagePlaceholder(),
+        loadingBuilder: (_, child, progress) {
+          if (progress == null) return child;
+          return _imagePlaceholder(loading: true);
+        },
+      );
+    }
+    return _imagePlaceholder();
+  }
+
+  Widget _imagePlaceholder({bool loading = false}) {
+    return Container(
+      color: _kCatBg,
+      child: Center(
+        child: loading
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54))
+            : Icon(_categoryIcon(), size: 40, color: Colors.white38),
+      ),
+    );
+  }
+
+  IconData _categoryIcon() {
+    switch (venue.category.toLowerCase()) {
+      case 'restoran': case 'yeme-içme': return Icons.restaurant_rounded;
+      case 'kafe': return Icons.coffee_rounded;
+      case 'bar': return Icons.local_bar_rounded;
+      case 'otel': return Icons.hotel_rounded;
+      case 'müze': case 'kültür': return Icons.museum_rounded;
+      default: return Icons.place_rounded;
+    }
+  }
+
+  String _formatCount(int n) => n >= 1000 ? '${(n / 1000).toStringAsFixed(1)}B' : n.toString();
+
+  String _budgetLabel(Venue venue) {
+    switch (venue.budget) {
+      case 'low': return 'Uygun';
+      case 'mid': return 'Makul';
+      case 'high': return 'Yüksek';
+      default: return 'Makul';
+    }
+  }
 }
 
-// ---------------------------------------------------------------------------
-// Vertical venue card (for popular section)
-// ---------------------------------------------------------------------------
+// ═══════════════════════════════════════════════════════════════════════════
+// Tag Chip — cream background with blue border (exactly like WebView)
+// ═══════════════════════════════════════════════════════════════════════════
 
-class _VenueListCard extends StatelessWidget {
-  final Venue venue;
-  final int index;
-  final VoidCallback onTap;
-
-  const _VenueListCard({
-    required this.venue,
-    required this.index,
-    required this.onTap,
-  });
+class _TagChip extends StatelessWidget {
+  final String label;
+  const _TagChip(this.label);
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: const Color(0xFFd5e8d3),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            // Rank number
-            SizedBox(
-              width: 28,
-              child: Text(
-                '$index',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: const Color(0xFF2d6b3f).withValues(alpha: 0.4),
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Image
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: 52,
-                height: 52,
-                child: venue.imageUrl != null && venue.imageUrl!.isNotEmpty
-                    ? Image.network(
-                        venue.imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFF45503f).withValues(alpha: 0.3),
-                          child: const Icon(Icons.place_rounded,
-                              color: Color(0xFF2d6b3f), size: 24),
-                        ),
-                      )
-                    : Container(
-                        color: const Color(0xFF45503f).withValues(alpha: 0.3),
-                        child: const Icon(Icons.place_rounded,
-                            color: Color(0xFF2d6b3f), size: 24),
-                      ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    venue.name,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1a1a1a),
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    [venue.category, venue.district]
-                        .where((s) => s != null && s.isNotEmpty)
-                        .join(' · '),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: const Color(0xFF1a1a1a).withValues(alpha: 0.5),
-                    ),
-                    maxLines: 1,
-                  ),
-                ],
-              ),
-            ),
-            // Rating
-            if (venue.rating != null) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2d6b3f),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.star_rounded, size: 14, color: Color(0xFFf59e0b)),
-                    const SizedBox(width: 3),
-                    Text(
-                      venue.rating!.toStringAsFixed(1),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: _kChipBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _kChipBorder, width: 1),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.plusJakartaSans(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: const Color(0xFF093826),
         ),
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Info Chip — with icon (budget, distance, rating)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color? iconColor;
+  const _InfoChip({required this.icon, required this.label, this.iconColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: _kChipBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _kChipBorder, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: iconColor ?? const Color(0xFF093826)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF093826),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoImageChip extends StatelessWidget {
+  final String assetPath;
+  final String label;
+  const _InfoImageChip({required this.assetPath, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: _kChipBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _kChipBorder, width: 1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(assetPath, width: 16, height: 16),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF093826),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Category Results Page — opens when a category is tapped
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _CategoryResultsPage extends StatefulWidget {
+  final String category;
+  final Position? currentPosition;
+  const _CategoryResultsPage({required this.category, this.currentPosition});
+
+  @override
+  State<_CategoryResultsPage> createState() => _CategoryResultsPageState();
+}
+
+class _CategoryResultsPageState extends State<_CategoryResultsPage> {
+  List<Venue> _venues = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final venues = await VenueService.searchVenues(query: widget.category, limit: 20);
+      if (!mounted) return;
+      setState(() {
+        _venues = venues;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
+  }
+
+  String _calcDistance(Venue v) {
+    if (widget.currentPosition == null || v.latitude == null || v.longitude == null) return '';
+    final d = Geolocator.distanceBetween(
+      widget.currentPosition!.latitude, widget.currentPosition!.longitude,
+      v.latitude!, v.longitude!,
+    );
+    if (d > 100000) return '';
+    if (d < 1000) return '${d.toStringAsFixed(0)} m';
+    return '${(d / 1000).toStringAsFixed(1)} km';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _kBg,
+      appBar: AppBar(
+        title: Text(widget.category, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+        backgroundColor: _kBg,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: _kChipBorder))
+          : _venues.isEmpty
+              ? Center(
+                  child: Text(
+                    'Bu kategoride mekan bulunamadı',
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 16),
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                  itemCount: _venues.length,
+                  itemBuilder: (_, i) {
+                    final v = _venues[i];
+                    return _VenueCard(
+                      venue: v,
+                      distance: _calcDistance(v),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => VenueDetailScreen(venue: v)),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }

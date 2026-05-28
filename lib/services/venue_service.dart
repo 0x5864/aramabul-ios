@@ -131,6 +131,7 @@ class VenueService {
     required String query,
     String? city,
     String? category,
+    String? district,
     int limit = 20,
   }) async {
     try {
@@ -139,6 +140,7 @@ class VenueService {
         'limit': limit.toString(),
         if (city != null) 'city': city,
         if (category != null) 'category': category,
+        if (district != null) 'district': district,
       };
       final uri = Uri.parse('$kApiBase/api/venues/search')
           .replace(queryParameters: params);
@@ -159,6 +161,62 @@ class VenueService {
       return _parseVenueResponse(body);
     } catch (e) {
       debugPrint('[VenueService] search error: $e');
+      return [];
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Featured Venues (MVP API — same as web version)
+  // ---------------------------------------------------------------------------
+
+  /// Fetches random venues with photos from /api/mvp/istanbul/venues.
+  /// This is the same endpoint used by the web version's featured-venues.js.
+  static Future<List<Venue>> fetchFeaturedVenues({int limit = 15}) async {
+    try {
+      final seed = DateTime.now().millisecondsSinceEpoch % 2000000000;
+      final params = {
+        'sort': 'random',
+        'limit': limit.toString(),
+        'photoState': 'has_photo',
+        'randomSeed': seed.toString(),
+      };
+      final uri = Uri.parse('$kApiBase/api/mvp/istanbul/venues')
+          .replace(queryParameters: params);
+
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 10);
+      final request = await client.getUrl(uri);
+      request.headers.set('Accept', 'application/json');
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      client.close();
+
+      if (response.statusCode != 200) {
+        debugPrint('[VenueService] fetchFeatured ${response.statusCode}');
+        return [];
+      }
+
+      final data = jsonDecode(body);
+      if (data is Map && data['items'] is List) {
+        return (data['items'] as List).map((e) {
+          final map = e as Map<String, dynamic>;
+          final mapped = <String, dynamic>{
+            ...map,
+            if (map['cuisine'] != null && map['category'] == null)
+              'category': map['cuisine'],
+            if (map['userRatingCount'] != null && map['reviewCount'] == null)
+              'reviewCount': map['userRatingCount'],
+            if (map['photoUri'] != null && map['imageUrl'] == null)
+              'imageUrl': map['photoUri'],
+            if (map['id'] == null && map['slug'] != null)
+              'id': map['slug'].hashCode.abs(),
+          };
+          return Venue.fromJson(mapped);
+        }).toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('[VenueService] fetchFeatured error: $e');
       return [];
     }
   }
@@ -227,6 +285,137 @@ class VenueService {
     } catch (e) {
       debugPrint('[VenueService] deleteAccount error: $e');
       return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Update Profile (API)
+  // ---------------------------------------------------------------------------
+
+  static Future<bool> updateProfile({
+    required String email,
+    required String name,
+  }) async {
+    try {
+      final client = HttpClient();
+      final request = await client.postUrl(
+        Uri.parse('$kApiBase/api/auth/update-profile'),
+      );
+      request.headers.set('Content-Type', 'application/json');
+      request.write(jsonEncode({
+        'email': email,
+        'name': name,
+      }));
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      client.close();
+
+      debugPrint('[VenueService] updateProfile ${response.statusCode}: $body');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(body);
+        return data is Map && data['ok'] == true;
+      }
+      // Even if API returns non-200, save locally
+      return true;
+    } catch (e) {
+      debugPrint('[VenueService] updateProfile error: $e');
+      // Save locally even if API fails
+      return true;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Password Reset (API)
+  // ---------------------------------------------------------------------------
+
+  static Future<bool> sendPasswordReset(String email) async {
+    try {
+      final client = HttpClient();
+      final request = await client.postUrl(
+        Uri.parse('$kApiBase/api/auth/reset-password'),
+      );
+      request.headers.set('Content-Type', 'application/json');
+      request.write(jsonEncode({'email': email}));
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      client.close();
+
+      debugPrint('[VenueService] resetPassword ${response.statusCode}: $body');
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('[VenueService] resetPassword error: $e');
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Feedback (API)
+  // ---------------------------------------------------------------------------
+
+  static Future<bool> sendFeedback({
+    required String name,
+    required String email,
+    required String subject,
+    required String message,
+  }) async {
+    try {
+      final client = HttpClient();
+      final request = await client.postUrl(
+        Uri.parse('$kApiBase/api/feedback'),
+      );
+      request.headers.set('Content-Type', 'application/json');
+      request.write(jsonEncode({
+        'name': name,
+        'email': email,
+        'subject': subject,
+        'message': message,
+        'platform': 'ios',
+      }));
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      client.close();
+
+      debugPrint('[VenueService] sendFeedback ${response.statusCode}: $body');
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('[VenueService] sendFeedback error: $e');
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Admin Login (API)
+  // ---------------------------------------------------------------------------
+
+  static Future<Map<String, dynamic>?> adminLogin({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final client = HttpClient();
+      final request = await client.postUrl(
+        Uri.parse('$kApiBase/api/auth/admin-login'),
+      );
+      request.headers.set('Content-Type', 'application/json');
+      request.write(jsonEncode({
+        'email': email,
+        'password': password,
+      }));
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      client.close();
+
+      debugPrint('[VenueService] adminLogin ${response.statusCode}: $body');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(body);
+        if (data is Map<String, dynamic> && data['ok'] == true) {
+          return data;
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('[VenueService] adminLogin error: $e');
+      return null;
     }
   }
 

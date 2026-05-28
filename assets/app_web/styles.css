@@ -2,7 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg: #45503f;
+  --bg: #094174;
   --paper: #d5e8d3;
   --ink: #162123;
   --accent: #3a7d44;
@@ -185,7 +185,7 @@ main {
   padding-inline-end: max(calc((100vw - 1220px) / 2), 1.2rem);
   padding-bottom: 0.3rem;
   border-bottom: 1px solid rgba(168, 213, 162, 0.2);
-  background: #45503f;
+  background: #094174;
 }
 
 .global-topbar::after {
@@ -384,7 +384,7 @@ main {
 
 .search-page .header-search-btn {
   border: 0;
-  background: linear-gradient(145deg, #d4854a 0%, #c37238 100%);
+  background: #011e3a;
   color: #fff;
   display: inline-flex;
   align-items: center;
@@ -485,7 +485,7 @@ main {
 .header-search-btn {
   border: 1px solid #baae89;
   border-radius: 8px;
-  background: linear-gradient(145deg, #d4854a 0%, #c37238 100%);
+  background: #011e3a;
   color: #fff;
   min-height: 34px;
   min-width: 56px;
@@ -659,10 +659,6 @@ main {
 
 .lang-switch-option:hover,
 .lang-switch-option:focus-visible {
-  border-color: var(--hover-blue);
-  color: #116466;
-  background: var(--hover-blue-soft);
-  box-shadow: 0 0 0 2px var(--hover-blue-soft);
   outline: none;
 }
 
@@ -943,7 +939,7 @@ link[rel="apple-touch-icon"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(145deg, #d4854a 0%, #c37238 100%);
+  background: #011e3a;
   color: #fff;
   font: inherit;
   font-size: 0.84rem;
@@ -6554,7 +6550,7 @@ body.mobile-chrome-browser.mobile-force-layout .brand-wordmark {
   max-width: 100%;
   margin-bottom: 0;
   border: 1px solid rgba(220, 226, 229, 0.92);
-  border-radius: 4px;
+  border-radius: 10px;
   background: #ffffff;
   aspect-ratio: 4 / 3;
 }
@@ -6808,7 +6804,7 @@ body.sanat-page .istanbul-discovery-shell > .istanbul-breadcrumb {
 .admin-logout-button {
   border: 0;
   border-radius: 14px;
-  background: linear-gradient(145deg, #d4854a 0%, #c37238 100%);
+  background: #011e3a;
   color: #fff;
   min-height: 34px;
   font: inherit;
@@ -8543,7 +8539,7 @@ body.yeme-icme-page .istanbul-results-grid {
 .istanbul-venue-card {
   border: 1px solid rgba(22, 93, 91, 0.12);
   border-radius: 14px;
-  background: linear-gradient(145deg, #e8f0e4 0%, #d5e8d3 40%, #c9dfca 100%);
+  background: #bdd8e9;
   padding: 0.7rem;
   display: grid;
   gap: 0.45rem;
@@ -8561,7 +8557,7 @@ body.yeme-icme-page .istanbul-results-grid {
 .istanbul-venue-media {
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(22, 33, 35, 0.15);
+  border: none;
   border-radius: 4px;
   line-height: 0;
   font-size: 0;
@@ -9339,14 +9335,161 @@ body.yeme-icme-page .istanbul-results-grid {
   display: block;
 }
 
+/* Right column: photo + map + button stacked */
+.venue-detail-right-col {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  align-self: start;
+}
+
+/* Inline map below photo — same size as photo */
+.venue-detail-map-inline {
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid rgba(220, 226, 229, 0.92);
+  margin-top: 0.5rem;
+}
+
+.venue-detail-map-actions-inline {
+  margin-top: 0.4rem;
+}
+
+.venue-detail-map-inline-frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+
+
+
+.venue-detail-directions-btn,
+.venue-detail-directions-btn:link,
+.venue-detail-directions-btn:visited,
+.venue-detail-directions-btn:hover,
+.venue-detail-directions-btn:active {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+  padding: 0.45rem 0.9rem !important;
+  background: #1a73e8 !important;
+  color: #fff !important;
+  border-radius: 6px !important;
+  font-size: 0.85rem !important;
+  font-weight: 600 !important;
+  text-decoration: none !important;
+  border: none !important;
+}
+
+.venue-detail-directions-btn svg {
+  flex-shrink: 0;
+}
+
+.venue-detail-maps-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid rgba(210, 216, 219, 0.9);
+  color: #1a73e8;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.venue-detail-maps-link:hover {
+  background: rgba(26, 115, 232, 0.06);
+  border-color: #1a73e8;
+}
+
+/* Similar venues */
+.venue-detail-similar {
+  margin-top: 0.75rem;
+}
+
+.venue-detail-similar-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #1b2029;
+  margin: 0 0 0.5rem;
+}
+
+.venue-detail-similar-list {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+
+.venue-detail-similar-list::-webkit-scrollbar {
+  height: 4px;
+}
+
+.venue-detail-similar-list::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.15);
+  border-radius: 2px;
+}
+
+.venue-detail-similar-card {
+  flex: 0 0 130px;
+  scroll-snap-align: start;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(210, 216, 219, 0.9);
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.2s ease;
+}
+
+.venue-detail-similar-card:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.venue-detail-similar-card-img {
+  width: 100%;
+  height: 85px;
+  object-fit: cover;
+  display: block;
+  background: #eef1f3;
+}
+
+.venue-detail-similar-card-body {
+  padding: 0.35rem 0.45rem;
+}
+
+.venue-detail-similar-card-name {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #1b2029;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.venue-detail-similar-card-meta {
+  font-size: 0.65rem;
+  color: rgba(27, 32, 41, 0.6);
+  margin: 2px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .venue-detail-review-form {
   display: grid;
   gap: 0.78rem;
-  border: 1px solid rgba(210, 216, 219, 0.92);
+  border: 1px solid rgba(210, 216, 219, 0.92) !important;
   border-radius: 8px;
-  background: #ffffff;
+  background: #ffffff !important;
   padding: 1rem;
-  box-shadow: 0 12px 24px rgba(27, 32, 41, 0.05);
+  box-shadow: 0 12px 24px rgba(27, 32, 41, 0.05) !important;
 }
 
 .venue-detail-review-field {
@@ -9483,8 +9626,8 @@ body.yeme-icme-page .istanbul-results-grid {
 }
 
 .admin-panel-nav-card.is-active {
-  border-color: #093826;
-  background: #093826;
+  border-color: #094174;
+  background: #094174;
   color: #ffffff;
 }
 
@@ -11128,7 +11271,7 @@ button.admin-content-model-geo-neighborhood.is-active {
 /* ── Ustalara Saygı Kutusu ── */
 .home-ustalara-saygi {
   overflow: hidden;
-  background: #e0d9cb !important;
+  background: #7bbce8 !important;
 }
 
 a.ustalara-saygi-inner,
@@ -11182,15 +11325,16 @@ a.ustalara-saygi-inner,
 
 /* ── Lezzet Durakları Mekan Linkleri ── */
 .lezzet-venue-link {
-  color: #1a6b4a;
-  text-decoration: none;
+  color: #094072 !important;
+  text-decoration: none !important;
   font-weight: 600;
   transition: color 0.18s ease;
 }
 
 .lezzet-venue-link:hover,
 .lezzet-venue-link:focus-visible {
-  color: #0d4a30;
+  color: #0a2e52 !important;
+  text-decoration: none !important;
 }
 
 /* ── Content Guide (SEO / AdSense editoryal blok) ── */
@@ -11308,6 +11452,7 @@ a.ustalara-saygi-inner,
 }
 
 .header-search-input {
+  border: none !important;
   border-radius: 8px !important;
 }
 .header-search-btn {
@@ -11327,22 +11472,22 @@ a.ustalara-saygi-inner,
 
 .desktop-auth-links .lang-switch-option.active,
 .lang-switch-menu .lang-switch-option.active {
-  background: #d5e8d3 !important;
-  border-color: #1a4a2e !important;
-  color: #1a4a2e !important;
+  background: #bdd8e9 !important;
+  border-color: #7bbce8 !important;
+  color: #011e3a !important;
 }
 
 /* --- Cards & Panels --- */
 .istanbul-venue-card,
 .istanbul-venue-card-inner {
-  background: linear-gradient(145deg, #e8f0e4 0%, #d5e8d3 40%, #c9dfca 100%) !important;
+  background: #bdd8e9 !important;
   border: 1px solid rgba(22, 93, 91, 0.10) !important;
   box-shadow: 0 4px 14px rgba(9, 56, 38, 0.08), 0 1px 3px rgba(9, 56, 38, 0.05) !important;
 }
 
 .featured-venues-section .istanbul-venue-card,
 .featured-venues-section .istanbul-venue-card-inner {
-  background: #ede5d5 !important;
+  background: #bdd8e9 !important;
 }
 
 .istanbul-discovery-hero-label,
@@ -11356,7 +11501,7 @@ a.ustalara-saygi-inner,
 .venue-detail-meta-pill,
 .venue-detail-chip {
   background: rgba(255, 255, 255, 0.6) !important;
-  border: 1px solid rgba(22, 93, 91, 0.12) !important;
+  border: 1px solid #7bbce8 !important;
   font-family: var(--ui-font-family) !important;
   font-size: 0.82rem !important;
   font-weight: 400 !important;
@@ -11366,11 +11511,18 @@ a.ustalara-saygi-inner,
   backdrop-filter: blur(4px);
 }
 
-.top-city-card,
-.category-home-card {
+.top-city-card {
   background: #71935d !important;
   border: none !important;
   box-shadow: 0 4px 14px rgba(9, 56, 38, 0.08), 0 1px 3px rgba(9, 56, 38, 0.05) !important;
+  color: #ffffff !important;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.category-home-card {
+  background: #48769f !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(30, 60, 90, 0.15), 0 1px 3px rgba(30, 60, 90, 0.08) !important;
   color: #ffffff !important;
   transition: transform 0.22s ease, box-shadow 0.22s ease;
 }
@@ -11391,16 +11543,15 @@ a.ustalara-saygi-inner,
 
 .venue-detail-main-card,
 .venue-detail-side-card {
-  background: linear-gradient(145deg, #e8f0e4 0%, #d5e8d3 40%, #c9dfca 100%) !important;
+  background: #bdd8e9 !important;
   border: 1px solid rgba(22, 93, 91, 0.10) !important;
   box-shadow: 0 4px 14px rgba(9, 56, 38, 0.08), 0 1px 3px rgba(9, 56, 38, 0.05) !important;
 }
 
 .venue-detail-media,
 .venue-detail-info,
-.venue-detail-reviews,
-.venue-detail-review-form {
-  background: linear-gradient(145deg, #e8f0e4 0%, #d5e8d3 40%, #c9dfca 100%) !important;
+.venue-detail-reviews {
+  background: #bdd8e9 !important;
   border: 1px solid rgba(22, 93, 91, 0.10) !important;
   box-shadow: 0 3px 10px rgba(9, 56, 38, 0.06) !important;
 }
@@ -11408,27 +11559,27 @@ a.ustalara-saygi-inner,
 .settings-card,
 .settings-panel-card,
 .settings-sidebar-card {
-  background: linear-gradient(145deg, #e8f0e4 0%, #d5e8d3 40%, #c9dfca 100%) !important;
+  background: #bdd8e9 !important;
   border: 1px solid rgba(22, 93, 91, 0.10) !important;
   box-shadow: 0 4px 14px rgba(9, 56, 38, 0.08), 0 1px 3px rgba(9, 56, 38, 0.05) !important;
 }
 
 .istanbul-filter-location-box,
 .istanbul-filter-section-box {
-  background: #4b3123 !important;
+  background: #48769f !important;
   border: none !important;
   border-radius: 14px !important;
   padding: 1.1rem !important;
   margin-bottom: 8px !important;
-  box-shadow: 0 3px 8px rgba(40, 26, 18, 0.3) !important;
-  color: #f5e6d0 !important;
+  box-shadow: 0 3px 8px rgba(140, 100, 70, 0.25) !important;
+  color: #fff !important;
 }
 
 .istanbul-filter-location-box-title,
 .istanbul-filter-section-box-title,
 .istanbul-filter-field > span:first-child,
 .istanbul-filter-yeme-icme-budget-nest-label {
-  color: #fdf8f0 !important;
+  color: #fff !important;
 }
 
 /* --- Dropdown hover & active: #c8773e uyumlu --- */
@@ -11460,7 +11611,7 @@ a.ustalara-saygi-inner,
 }
 
 .content-guide.home-ustalara-saygi {
-  background: #e8c37b !important;
+  background: #7bbce8 !important;
   border-radius: 14px !important;
 }
 
@@ -11611,8 +11762,8 @@ body.saglik-page .content-guide h2,
 .settings-feedback-submit,
 .settings-signout,
 .settings-signup-submit {
-  background: #144940 !important;
-  border-color: #0f3a33 !important;
+  background: #011e3a !important;
+  border-color: #011e3a !important;
   color: #fff !important;
   border-radius: 12px !important;
   box-shadow: 0 3px 8px rgba(20, 73, 64, 0.25);
@@ -11620,8 +11771,8 @@ body.saglik-page .content-guide h2,
 }
 
 .header-search-btn {
-  background: #71935d !important;
-  border-color: #71935d !important;
+  background: #011e3a !important;
+  border-color: #011e3a !important;
   color: #fff !important;
   border-radius: 8px !important;
   box-shadow: 0 3px 8px rgba(43, 66, 73, 0.3);
@@ -11630,8 +11781,8 @@ body.saglik-page .content-guide h2,
 
 .istanbul-discovery-primary-button,
 .istanbul-filter-nearby-panel-button {
-  background: #71935d !important;
-  border-color: #71935d !important;
+  background: #011e3a !important;
+  border-color: #011e3a !important;
   color: #fff !important;
   border-radius: 12px !important;
   box-shadow: 0 3px 8px rgba(43, 66, 73, 0.3);
@@ -11639,8 +11790,8 @@ body.saglik-page .content-guide h2,
 }
 
 .store-badge {
-  background: #0f2d1f !important;
-  border-color: #0f2d1f !important;
+  background: #011e3a !important;
+  border-color: #011e3a !important;
   color: #fff !important;
 }
 
@@ -11658,14 +11809,14 @@ body.saglik-page .content-guide h2,
 }
 
 .header-search-btn:hover {
-  background: #5a7a4a !important;
+  background: #0a2e52 !important;
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(20, 73, 64, 0.35) !important;
 }
 
 .istanbul-discovery-primary-button:hover,
 .istanbul-filter-nearby-panel-button:hover {
-  background: #5a7a4a !important;
+  background: #0a2e52 !important;
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(20, 73, 64, 0.35) !important;
 }
@@ -11676,8 +11827,8 @@ body.saglik-page .content-guide h2,
 }
 
 .istanbul-pagination-button {
-  background: linear-gradient(145deg, #d4854a 0%, #c37238 100%) !important;
-  border-color: #b0652f !important;
+  background: #011e3a !important;
+  border-color: #011e3a !important;
   color: #fff !important;
   border-radius: 12px !important;
   box-shadow: 0 3px 8px rgba(195, 114, 56, 0.25);
@@ -11719,19 +11870,21 @@ body.saglik-page .content-guide h2,
 .settings-feedback-field textarea,
 .settings-feedback-field select,
 .settings-signup-field input,
-.settings-feedback-phone-group input {
+.settings-feedback-phone-group input,
+.settings-feedback-phone-prefix {
   background: #fff !important;
   color: #000 !important;
+  border: 1px solid #7bbce8 !important;
 }
 
 /* --- Header band & topbar: match logo (#45503f) --- */
 .global-header-band {
-  background: #45503f !important;
+  background: #094174 !important;
   border-bottom-color: rgba(255,255,255,0.1) !important;
 }
 
 .global-topbar {
-  background: #45503f !important;
+  background: #094174 !important;
   border-bottom: none !important;
 }
 
@@ -11741,7 +11894,7 @@ body.saglik-page .content-guide h2,
 }
 
 .global-topbar .brand-wordmark-rest {
-  color: #a8d5a2 !important;
+  color: #7bbce8 !important;
   font-weight: 500 !important;
 }
 
@@ -11751,6 +11904,8 @@ body.saglik-page .content-guide h2,
 }
 
 .brand-logo {
+  width: 100px;
+  height: 100px;
   border-radius: 8px;
 }
 
@@ -11775,7 +11930,7 @@ body.saglik-page .content-guide h2,
 }
 
 .global-topline {
-  background: #45503f !important;
+  background: #094174 !important;
   border: none !important;
 }
 
@@ -11792,7 +11947,7 @@ body.saglik-page .content-guide h2,
 
 /* --- Mobile bottom nav: teal --- */
 .mobile-bottom-nav {
-  background: #45503f !important;
+  background: #094174 !important;
 }
 
 .mobile-bottom-nav-btn .mobile-bottom-nav-label {
@@ -11844,14 +11999,14 @@ body.saglik-page .content-guide h2,
 }
 
 .favorites-grid .istanbul-venue-card {
-  background: #d7d7d7 !important;
+  background: #bdd8e9 !important;
   border: none !important;
   border-radius: 14px !important;
   padding: 1rem !important;
 }
 
 .favorites-grid .istanbul-venue-eyebrow {
-  color: #555 !important;
+  color: #333 !important;
   font-size: 0.85rem !important;
   text-transform: none !important;
   font-weight: 400 !important;
@@ -11864,8 +12019,8 @@ body.saglik-page .content-guide h2,
 }
 
 .favorites-grid .istanbul-favorite-button.is-active {
-  background: #8d5e46 !important;
-  border-color: #8d5e46 !important;
+  background: #011e3a !important;
+  border-color: #011e3a !important;
   color: #ffffff !important;
   border-radius: 8px !important;
   padding: 0.35rem 1rem !important;
@@ -11914,7 +12069,7 @@ body.saglik-page .content-guide h2,
   padding: 0.7rem 1rem;
   border: none;
   border-radius: 14px !important;
-  background: #71935d;
+  background: #011e3a;
   color: #fff;
   font-family: inherit;
   font-size: 0.84rem;
@@ -11927,7 +12082,7 @@ body.saglik-page .content-guide h2,
 }
 
 .bh-cta-button:hover {
-  background: #5a7a4a;
+  background: #0a2e52;
   transform: translateY(-2px);
   box-shadow: 0 6px 16px rgba(107, 70, 51, 0.35);
 }
@@ -11979,9 +12134,9 @@ body.saglik-page .content-guide h2,
 
 /* Modal box */
 .bh-modal {
-  background: #e8f5e9;
+  background: linear-gradient(135deg, #f0f7ff 0%, #e6f0fa 100%);
   border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(9, 56, 38, 0.08);
+  box-shadow: 0 20px 60px rgba(13, 32, 50, 0.25), 0 0 0 1px rgba(13, 32, 50, 0.08);
   width: 100%;
   max-width: 480px;
   max-height: 90vh;
@@ -12002,13 +12157,13 @@ body.saglik-page .content-guide h2,
   align-items: center;
   justify-content: space-between;
   padding: 1.25rem 1.5rem 0.75rem;
-  border-bottom: 1px solid rgba(9, 56, 38, 0.08);
+  border-bottom: 1px solid rgba(13, 32, 50, 0.08);
 }
 
 .bh-modal-title {
   font-size: 1.15rem;
   font-weight: 700;
-  color: #093826;
+  color: #0a2540;
   margin: 0;
 }
 
@@ -12019,9 +12174,9 @@ body.saglik-page .content-guide h2,
   align-items: center;
   justify-content: center;
   border: none;
-  background: rgba(9, 56, 38, 0.06);
+  background: rgba(13, 32, 50, 0.06);
   border-radius: 8px;
-  color: #093826;
+  color: #0a2540;
   font-size: 1rem;
   cursor: pointer;
   transition: background 0.15s ease;
@@ -12029,7 +12184,7 @@ body.saglik-page .content-guide h2,
 }
 
 .bh-modal-close:hover {
-  background: rgba(9, 56, 38, 0.14);
+  background: rgba(13, 32, 50, 0.14);
 }
 
 /* Form */
@@ -12039,7 +12194,7 @@ body.saglik-page .content-guide h2,
 
 .bh-form-intro {
   font-size: 0.82rem;
-  color: #4a5c57;
+  color: #405973;
   line-height: 1.5;
   margin: 0 0 1.25rem;
 }
@@ -12053,7 +12208,7 @@ body.saglik-page .content-guide h2,
   display: block;
   font-size: 0.82rem;
   font-weight: 600;
-  color: #093826;
+  color: #0a2540;
   margin-bottom: 0.35rem;
 }
 
@@ -12065,7 +12220,7 @@ body.saglik-page .content-guide h2,
 
 .bh-field-optional {
   font-weight: 400;
-  color: #7a8c87;
+  color: #607993;
   font-size: 0.78rem;
 }
 
@@ -12073,7 +12228,7 @@ body.saglik-page .content-guide h2,
   display: block;
   width: 100%;
   padding: 0.6rem 0.75rem;
-  border: 1.5px solid rgba(9, 56, 38, 0.18);
+  border: 1.5px solid rgba(13, 32, 50, 0.15);
   border-radius: 8px;
   background: #fff;
   color: #011d36;
@@ -12084,13 +12239,13 @@ body.saglik-page .content-guide h2,
 }
 
 .bh-input::placeholder {
-  color: #a0b0ab;
+  color: #90a5bc;
 }
 
 .bh-input:focus {
   outline: none;
-  border-color: #093826;
-  box-shadow: 0 0 0 3px rgba(9, 56, 38, 0.1);
+  border-color: #0d2032;
+  box-shadow: 0 0 0 3px rgba(13, 32, 50, 0.1);
 }
 
 /* Actions */
@@ -12107,7 +12262,7 @@ body.saglik-page .content-guide h2,
   padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 4px;
-  background: #093826;
+  background: #011e3a;
   color: #fff;
   font-family: inherit;
   font-size: 0.92rem;
@@ -12117,7 +12272,7 @@ body.saglik-page .content-guide h2,
 }
 
 .bh-submit-btn:hover:not(:disabled) {
-  background: #0b4a33;
+  background: #0f3154;
   transform: translateY(-1px);
 }
 
@@ -12252,7 +12407,7 @@ body.saglik-page .content-guide h2,
   padding: 0.4rem 1.1rem;
   font-size: 0.85rem;
   font-weight: 400;
-  background: #71935d;
+  background: #011e3a;
   color: #fff;
   border: 1px solid #baae89;
   cursor: pointer;
@@ -12287,7 +12442,7 @@ body.saglik-page .content-guide h2,
 .istanbul-venue-card,
 .istanbul-venue-card-inner {
   border-radius: 14px !important;
-  border: 1px solid #baae89 !important;
+  border: 1px solid #7bbce8 !important;
   box-shadow: 0 4px 14px rgba(9, 56, 38, 0.08), 0 1px 3px rgba(9, 56, 38, 0.06) !important;
   transition: transform 0.22s ease, box-shadow 0.22s ease !important;
   overflow: hidden;
@@ -12308,6 +12463,9 @@ body.saglik-page .content-guide h2,
   border-radius: 4px;
   height: 160px;
   transition: transform 0.3s ease;
+  border: none !important;
+  outline: none !important;
+  background: #bdd8e9;
 }
 
 .istanbul-venue-card:hover .istanbul-venue-image {
@@ -12347,7 +12505,7 @@ body.saglik-page .content-guide h2,
 
 .istanbul-venue-tag {
   background: #ffffff !important;
-  border: 1px solid #baae89 !important;
+  border: 1px solid #7bbce8 !important;
   border-radius: 8px !important;
   font-size: 0.76rem !important;
   padding: 0.25rem 0.55rem !important;
@@ -12361,115 +12519,7 @@ body.saglik-page .content-guide h2,
 }
 
 /* --- Category Color Themes via data-card-category --- */
-
-/* Sanat: Tiyatrolar, Opera, Galeriler — mor/leylak */
-.istanbul-venue-card[data-card-category*="tiyatro"],
-.istanbul-venue-card[data-card-category*="opera"],
-.istanbul-venue-card[data-card-category*="bale"] {
-  background: linear-gradient(145deg, #ece4f0 0%, #ddd3e8 40%, #d0c5dc 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="galeri"] {
-  background: linear-gradient(145deg, #f0e8ec 0%, #e8d8e0 40%, #dcc8d4 100%) !important;
-}
-
-/* Kültür: Müzeler, Camiler, Mağaralar — mavi/çelik */
-.istanbul-venue-card[data-card-category*="müze"],
-.istanbul-venue-card[data-card-category*="ören"] {
-  background: linear-gradient(145deg, #e4eaef 0%, #d3dee8 40%, #c7d3df 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="cami"],
-.istanbul-venue-card[data-card-category*="şelale"],
-.istanbul-venue-card[data-card-category*="mağara"] {
-  background: linear-gradient(145deg, #e2ecef 0%, #d0e0e6 40%, #c2d5dc 100%) !important;
-}
-
-/* Sağlık: Hastane, Eczane, ASM — turkuaz */
-.istanbul-venue-card[data-card-category*="hastane"],
-.istanbul-venue-card[data-card-category*="aile"] {
-  background: linear-gradient(145deg, #e4f0ee 0%, #d3e8e5 40%, #c5deda 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="eczane"],
-.istanbul-venue-card[data-card-category*="nöbetçi"] {
-  background: linear-gradient(145deg, #e8f2ec 0%, #d8ebe1 40%, #cce3d8 100%) !important;
-}
-
-/* Gezi: Oteller — sıcak krem/bej */
-.istanbul-venue-card[data-card-category*="otel"],
-.istanbul-venue-card[data-card-category*="pansiyon"],
-.istanbul-venue-card[data-card-category*="hostel"],
-.istanbul-venue-card[data-card-category*="motel"] {
-  background: linear-gradient(145deg, #f0ece4 0%, #e6dfd3 40%, #ddd5c7 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="camping"],
-.istanbul-venue-card[data-card-category*="kamp"] {
-  background: linear-gradient(145deg, #e6efe4 0%, #d5e4cf 40%, #c8dac0 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="günübirlik"],
-.istanbul-venue-card[data-card-category*="mesire"] {
-  background: linear-gradient(145deg, #eaf0e4 0%, #dce8d3 40%, #cfdfc7 100%) !important;
-}
-
-/* Yeme-İçme: sıcak turuncu/terracotta tonları */
-.istanbul-venue-card[data-card-category*="restoran"],
-.istanbul-venue-card[data-card-category*="lokanta"],
-.istanbul-venue-card[data-card-category*="esnaf"] {
-  background: linear-gradient(145deg, #f0e8e2 0%, #e8dbd0 40%, #dfd0c2 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="kafe"],
-.istanbul-venue-card[data-card-category*="kahvaltı"] {
-  background: linear-gradient(145deg, #f0ede4 0%, #e8e2d3 40%, #dfd8c7 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="balık"],
-.istanbul-venue-card[data-card-category*="deniz"] {
-  background: linear-gradient(145deg, #e4ecf0 0%, #d3e1e8 40%, #c5d7df 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="bar"],
-.istanbul-venue-card[data-card-category*="meyhane"] {
-  background: linear-gradient(145deg, #efe4e8 0%, #e3d3da 40%, #d9c5cf 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="kebap"],
-.istanbul-venue-card[data-card-category*="döner"],
-.istanbul-venue-card[data-card-category*="köfte"],
-.istanbul-venue-card[data-card-category*="et-&-mangal"] {
-  background: linear-gradient(145deg, #efe8e4 0%, #e3d8d0 40%, #d9cec5 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="pizza"],
-.istanbul-venue-card[data-card-category*="burger"],
-.istanbul-venue-card[data-card-category*="sushi"],
-.istanbul-venue-card[data-card-category*="asya"] {
-  background: linear-gradient(145deg, #f0eae4 0%, #e8ded3 40%, #dfd4c7 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="tatlı"],
-.istanbul-venue-card[data-card-category*="börek"],
-.istanbul-venue-card[data-card-category*="fırın"],
-.istanbul-venue-card[data-card-category*="pide"],
-.istanbul-venue-card[data-card-category*="lahmacun"] {
-  background: linear-gradient(145deg, #f2efe6 0%, #eae5d8 40%, #e2dbcd 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="tavuk"],
-.istanbul-venue-card[data-card-category*="tantuni"],
-.istanbul-venue-card[data-card-category*="çiğ"],
-.istanbul-venue-card[data-card-category*="kokoreç"],
-.istanbul-venue-card[data-card-category*="çorba"],
-.istanbul-venue-card[data-card-category*="mantı"],
-.istanbul-venue-card[data-card-category*="vegan"] {
-  background: linear-gradient(145deg, #eef0e4 0%, #e2e8d3 40%, #d8dfc7 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="michelin"] {
-  background: linear-gradient(145deg, #ece4e6 0%, #e0d3d7 40%, #d6c5cb 100%) !important;
-}
-
-/* Hizmetler: Kuaför, Berber, Veteriner — toprak/doğal */
-.istanbul-venue-card[data-card-category*="kuaför"],
-.istanbul-venue-card[data-card-category*="berber"] {
-  background: linear-gradient(145deg, #f0ece6 0%, #e6dfda 40%, #ddd4cd 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="veteriner"] {
-  background: linear-gradient(145deg, #e6f0ea 0%, #d5e8de 40%, #c9dfd3 100%) !important;
-}
-.istanbul-venue-card[data-card-category*="akaryakıt"] {
-  background: linear-gradient(145deg, #eceef0 0%, #dfe2e8 40%, #d3d7df 100%) !important;
-}
+/* Disabled: all cards now use uniform #bdd8e9 */
 
 /* ================================================================== */
 /* Anasayfa Kategori Kartları — unified #2b4249 (per-category overrides removed) */
@@ -12548,7 +12598,7 @@ body.venue-detail-page .admin-login-card .admin-login-copy {
 .venue-detail-action-inline:visited {
   background: #fdf8f0 !important;
   color: #093826 !important;
-  border: 1px solid #baae89 !important;
+  border: 1px solid #7bbce8 !important;
   border-radius: 8px !important;
   font-size: 0.76rem !important;
   font-weight: 600 !important;
@@ -12559,7 +12609,7 @@ body.venue-detail-page .admin-login-card .admin-login-copy {
 /* ── Detay Sayfası Kart Zemin ── */
 .venue-detail-main-card,
 .venue-detail-side-card {
-  background: #ede4d5 !important;
+  background: #bdd8e9 !important;
   border-radius: 14px !important;
 }
 

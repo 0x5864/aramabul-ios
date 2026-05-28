@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../models/venue.dart';
 import '../services/venue_service.dart';
+import 'venue_detail_screen.dart';
 
 /// Native favorites screen — shows locally saved venues.
 /// Works fully offline, providing value beyond the WebView.
@@ -43,7 +44,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('${venue.name} favorilerden kaldırıldı'),
-        backgroundColor: const Color(0xFF2d6b3f),
+        backgroundColor: const Color(0xFF094174),
         action: SnackBarAction(
           label: 'Geri Al',
           textColor: Colors.white,
@@ -56,14 +57,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     );
   }
 
-  void _openVenueOnWeb(Venue venue) {
-    final slug = venue.slug ?? '';
-    if (slug.isNotEmpty) {
-      final url = 'https://aramabul.com/mekan/$slug';
-      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    } else if (venue.mapsUrl != null && venue.mapsUrl!.isNotEmpty) {
-      launchUrl(Uri.parse(venue.mapsUrl!), mode: LaunchMode.externalApplication);
-    }
+  void _openVenueDetail(Venue venue) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VenueDetailScreen(venue: venue),
+      ),
+    ).then((_) => _loadFavorites()); // refresh in case favorite was toggled
   }
 
   void _shareVenue(Venue venue) {
@@ -81,49 +81,90 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   void _openDirections(Venue venue) {
-    if (venue.latitude != null && venue.longitude != null) {
-      final url = 'https://maps.apple.com/?daddr=${venue.latitude},${venue.longitude}';
-      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    } else if (venue.mapsUrl != null && venue.mapsUrl!.isNotEmpty) {
-      launchUrl(Uri.parse(venue.mapsUrl!), mode: LaunchMode.externalApplication);
+    if (venue.latitude == null || venue.longitude == null) {
+      if (venue.mapsUrl != null && venue.mapsUrl!.isNotEmpty) {
+        launchUrl(Uri.parse(venue.mapsUrl!), mode: LaunchMode.externalApplication);
+      }
+      return;
     }
+    final lat = venue.latitude!;
+    final lng = venue.longitude!;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0d2137),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Yol Tarifi',
+                  style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.map_rounded, color: Colors.white),
+                title: const Text('Apple Haritalar', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  launchUrl(Uri.parse('https://maps.apple.com/?daddr=$lat,$lng'),
+                      mode: LaunchMode.externalApplication);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.directions_rounded, color: Colors.white),
+                title: const Text('Google Maps', style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(context);
+                  launchUrl(Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'),
+                      mode: LaunchMode.externalApplication);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF45503f),
+      backgroundColor: const Color(0xFF094174),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
+            // Breadcrumb header
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(Icons.favorite_rounded, color: Colors.white, size: 28),
-                  const SizedBox(width: 10),
-                  const Text(
-                    'Favorilerim',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const Spacer(),
                   Text(
-                    '${_favorites.length} mekan',
+                    'Anasayfa  /  Favorilerim',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.white.withValues(alpha: 0.7),
+                      color: Colors.white.withValues(alpha: 0.8),
                     ),
+                  ),
+                  GestureDetector(
+                    onTap: _loadFavorites,
+                    child: Image.asset('assets/welcome/refresh.png', width: 22, height: 22),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
 
             // Content
             Expanded(
@@ -142,61 +183,86 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.favorite_border_rounded,
-              size: 72,
-              color: Colors.white.withValues(alpha: 0.4),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Favori mekanların\nburada görünecek',
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              height: 1.2,
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Henüz favori mekanın yok',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.white.withValues(alpha: 0.8),
-              ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Yeme-İçme ekranından mekan\nkaydetmeye başlayabilirsin.',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.white.withValues(alpha: 0.75),
+              height: 1.5,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Keşfet sekmesinden mekanları favorilerine ekle,\nçevrimdışı bile erişebil.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white.withValues(alpha: 0.5),
-                height: 1.5,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildFavoritesList() {
     return RefreshIndicator(
-      color: const Color(0xFF2d6b3f),
+      color: const Color(0xFF094174),
       onRefresh: _loadFavorites,
       child: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         itemCount: _favorites.length,
         itemBuilder: (context, index) {
           final venue = _favorites[index];
-          return _FavoriteCard(
-            venue: venue,
-            onRemove: () => _removeFavorite(venue),
-            onTap: () => _openVenueOnWeb(venue),
-            onShare: () => _shareVenue(venue),
-            onCall: venue.phone != null && venue.phone!.isNotEmpty
-                ? () => _callVenue(venue)
-                : null,
-            onDirections: () => _openDirections(venue),
+          return Dismissible(
+            key: ValueKey(venue.id),
+            direction: DismissDirection.endToStart,
+            background: Container(
+              alignment: Alignment.centerRight,
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.only(right: 24),
+              decoration: BoxDecoration(
+                color: const Color(0xFFe74c3c),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.delete_rounded, color: Colors.white, size: 28),
+                  SizedBox(height: 4),
+                  Text(
+                    'Sil',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            confirmDismiss: (direction) async {
+              return true;
+            },
+            onDismissed: (direction) {
+              _removeFavorite(venue);
+            },
+            child: _FavoriteCard(
+              venue: venue,
+              onRemove: () => _removeFavorite(venue),
+              onTap: () => _openVenueDetail(venue),
+              onShare: () => _shareVenue(venue),
+              onCall: venue.phone != null && venue.phone!.isNotEmpty
+                  ? () => _callVenue(venue)
+                  : null,
+              onDirections: () => _openDirections(venue),
+            ),
           );
         },
       ),
@@ -226,7 +292,7 @@ class _FavoriteCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: const Color(0xFFd5e8d3),
+      color: const Color(0xFFbdd8e9),
       elevation: 0,
       child: InkWell(
         onTap: onTap,
@@ -244,7 +310,7 @@ class _FavoriteCard extends StatelessWidget {
                     width: 56,
                     height: 56,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF45503f).withValues(alpha: 0.3),
+                      color: const Color(0xFF094174).withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: venue.imageUrl != null && venue.imageUrl!.isNotEmpty
@@ -257,14 +323,14 @@ class _FavoriteCard extends StatelessWidget {
                               fit: BoxFit.cover,
                               errorBuilder: (_, __, ___) => const Icon(
                                 Icons.place_rounded,
-                                color: Color(0xFF2d6b3f),
+                                color: Color(0xFF094174),
                                 size: 28,
                               ),
                             ),
                           )
                         : const Icon(
                             Icons.place_rounded,
-                            color: Color(0xFF2d6b3f),
+                            color: Color(0xFF094174),
                             size: 28,
                           ),
                   ),
@@ -395,20 +461,20 @@ class _QuickAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: const Color(0xFF2d6b3f).withValues(alpha: 0.12),
+          color: const Color(0xFF094174).withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: const Color(0xFF2d6b3f)),
+            Icon(icon, size: 16, color: const Color(0xFF094174)),
             const SizedBox(width: 4),
             Text(
               label,
               style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF2d6b3f),
+                color: Color(0xFF094174),
               ),
             ),
           ],

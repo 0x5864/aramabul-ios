@@ -290,7 +290,7 @@ class _MapExploreScreenState extends State<MapExploreScreen>
                         padding: const EdgeInsets.symmetric(horizontal: 14),
                         decoration: BoxDecoration(
                           color: isSelected
-                              ? const Color(0xFF2d6b3f)
+                              ? const Color(0xFF094174)
                               : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
@@ -309,7 +309,7 @@ class _MapExploreScreenState extends State<MapExploreScreen>
                               size: 16,
                               color: isSelected
                                   ? Colors.white
-                                  : const Color(0xFF2d6b3f),
+                                  : const Color(0xFF094174),
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -342,7 +342,7 @@ class _MapExploreScreenState extends State<MapExploreScreen>
               right: 0,
               child: Center(
                 child: CircularProgressIndicator(
-                  color: Color(0xFF2d6b3f),
+                  color: Color(0xFF094174),
                 ),
               ),
             ),
@@ -370,7 +370,7 @@ class _MapExploreScreenState extends State<MapExploreScreen>
                   ),
                   child: const Icon(
                     Icons.my_location_rounded,
-                    color: Color(0xFF2d6b3f),
+                    color: Color(0xFF094174),
                     size: 24,
                   ),
                 ),
@@ -384,7 +384,7 @@ class _MapExploreScreenState extends State<MapExploreScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: const Color(0xFF2d6b3f),
+                color: const Color(0xFF094174),
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -438,7 +438,7 @@ class _MapExploreScreenState extends State<MapExploreScreen>
             decoration: BoxDecoration(
               color: isSelected
                   ? const Color(0xFFe74c3c)
-                  : const Color(0xFF2d6b3f),
+                  : const Color(0xFF094174),
               shape: BoxShape.circle,
               border: Border.all(
                 color: Colors.white,
@@ -448,7 +448,7 @@ class _MapExploreScreenState extends State<MapExploreScreen>
                 BoxShadow(
                   color: (isSelected
                           ? const Color(0xFFe74c3c)
-                          : const Color(0xFF2d6b3f))
+                          : const Color(0xFF094174))
                       .withValues(alpha: 0.4),
                   blurRadius: isSelected ? 12 : 6,
                   offset: const Offset(0, 2),
@@ -545,15 +545,15 @@ class _VenueMapCard extends StatelessWidget {
                         venue.imageUrl!,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFF45503f).withValues(alpha: 0.2),
+                          color: const Color(0xFF094174).withValues(alpha: 0.2),
                           child: const Icon(Icons.place_rounded,
-                              color: Color(0xFF2d6b3f), size: 32),
+                              color: Color(0xFF094174), size: 32),
                         ),
                       )
                     : Container(
-                        color: const Color(0xFF45503f).withValues(alpha: 0.2),
+                        color: const Color(0xFF094174).withValues(alpha: 0.2),
                         child: const Icon(Icons.place_rounded,
-                            color: Color(0xFF2d6b3f), size: 32),
+                            color: Color(0xFF094174), size: 32),
                       ),
               ),
             ),
@@ -615,7 +615,7 @@ class _VenueMapCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF2d6b3f),
+                            color: const Color(0xFF094174),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Text(
