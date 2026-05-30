@@ -315,10 +315,7 @@ class _MapExploreScreenState extends State<MapExploreScreen>
                             Text(
                               cat.label,
                               style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.w500,
+                                fontSize: 14,
                                 color: isSelected
                                     ? Colors.white
                                     : const Color(0xFF1a1a1a),
@@ -397,8 +394,7 @@ class _MapExploreScreenState extends State<MapExploreScreen>
               child: Text(
                 '${_venues.length} mekan',
                 style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
                   color: Colors.white,
                 ),
               ),
@@ -545,15 +541,27 @@ class _VenueMapCard extends StatelessWidget {
                         venue.imageUrl!,
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFF094174).withValues(alpha: 0.2),
-                          child: const Icon(Icons.place_rounded,
-                              color: Color(0xFF094174), size: 32),
+                          color: const Color(0xFFF1F5F9),
+                          child: Center(
+                            child: Image.asset(
+                              'assets/no_image.png',
+                              width: 28,
+                              height: 28,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
                         ),
                       )
                     : Container(
-                        color: const Color(0xFF094174).withValues(alpha: 0.2),
-                        child: const Icon(Icons.place_rounded,
-                            color: Color(0xFF094174), size: 32),
+                        color: const Color(0xFFF1F5F9),
+                        child: Center(
+                          child: Image.asset(
+                            'assets/no_image.png',
+                            width: 28,
+                            height: 28,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
                       ),
               ),
             ),
@@ -567,8 +575,7 @@ class _VenueMapCard extends StatelessWidget {
                   Text(
                     venue.name,
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
                       color: Color(0xFF1a1a1a),
                     ),
                     maxLines: 1,
@@ -580,7 +587,7 @@ class _VenueMapCard extends StatelessWidget {
                         .where((s) => s != null && s.isNotEmpty)
                         .join(' · '),
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       color: const Color(0xFF1a1a1a).withValues(alpha: 0.5),
                     ),
                   ),
@@ -595,7 +602,6 @@ class _VenueMapCard extends StatelessWidget {
                           venue.rating!.toStringAsFixed(1),
                           style: const TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700,
                             color: Color(0xFF1a1a1a),
                           ),
                         ),
@@ -604,7 +610,7 @@ class _VenueMapCard extends StatelessWidget {
                           Text(
                             '(${venue.reviewCount})',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 14,
                               color: const Color(0xFF1a1a1a)
                                   .withValues(alpha: 0.4),
                             ),
@@ -621,8 +627,7 @@ class _VenueMapCard extends StatelessWidget {
                           child: const Text(
                             'Detay →',
                             style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
                               color: Colors.white,
                             ),
                           ),

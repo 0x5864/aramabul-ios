@@ -3,12 +3,16 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/venue.dart';
 import '../services/venue_service.dart';
 import 'venue_detail_screen.dart';
 import 'lezzet_duraklari_screen.dart';
 import 'category_explore_screen.dart';
+import '../widgets/app_footer.dart';
+import '../widgets/maps_sheet.dart';
+import '../widgets/venue_dialog.dart';
 
 // ─── Color constants (matching WebView CSS injection) ────────────────────
 const _kBg = Color(0xFF094174);       // body background
@@ -67,20 +71,46 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Future<void> _loadVenues() async {
     setState(() => _isLoading = true);
     try {
-      final venues = await VenueService.fetchFeaturedVenues(limit: 15);
+      final venues = await VenueService.fetchFeaturedVenues(limit: 150);
       if (!mounted) return;
-      // Only venues with photos, shuffle and pick 3
-      final withPhoto = venues.where((v) => v.imageUrl != null && v.imageUrl!.isNotEmpty).toList();
-      withPhoto.shuffle();
-      final picked = withPhoto.take(3).toList();
+      
+      // Shuffle all fetched venues
+      var allVenues = List<Venue>.from(venues)..shuffle();
+      
+      // Filter only Yeme-İçme and Gezi categories AND ensure they have a photo
+      final filteredVenues = allVenues.where((v) {
+        final cat = v.category.toLowerCase();
+        final hasPhoto = v.imageUrl != null && v.imageUrl!.isNotEmpty && v.imageUrl!.startsWith('http');
+        final isCorrectCategory = cat == 'yeme-icme' || cat == 'gezi' || cat == 'restoran' || cat == 'kafe' || cat == 'bar' || cat == 'otel' || cat == 'yeme-içme';
+        return isCorrectCategory && hasPhoto;
+      }).toList();
+      
       setState(() {
-        _venues = picked.isNotEmpty ? picked : VenueService.fallbackVenues.take(3).toList();
+        _venues = filteredVenues.isNotEmpty 
+            ? filteredVenues.take(3).toList() 
+            : VenueService.fallbackVenues
+                .where((v) {
+                  final cat = v.category.toLowerCase();
+                  final hasPhoto = v.imageUrl != null && v.imageUrl!.isNotEmpty && v.imageUrl!.startsWith('http');
+                  final isCorrectCategory = cat == 'yeme-icme' || cat == 'gezi' || cat == 'restoran' || cat == 'kafe' || cat == 'bar' || cat == 'otel' || cat == 'yeme-içme';
+                  return isCorrectCategory && hasPhoto;
+                })
+                .take(3)
+                .toList();
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
+      var fallback = List<Venue>.from(VenueService.fallbackVenues)..shuffle();
+      final filteredFallback = fallback.where((v) {
+        final cat = v.category.toLowerCase();
+        final hasPhoto = v.imageUrl != null && v.imageUrl!.isNotEmpty && v.imageUrl!.startsWith('http');
+        final isCorrectCategory = cat == 'yeme-icme' || cat == 'gezi' || cat == 'restoran' || cat == 'kafe' || cat == 'bar' || cat == 'otel' || cat == 'yeme-içme';
+        return isCorrectCategory && hasPhoto;
+      }).toList();
+      
       setState(() {
-        _venues = VenueService.fallbackVenues;
+        _venues = filteredFallback.take(3).toList();
         _isLoading = false;
       });
     }
@@ -109,15 +139,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _openVenueDetail(Venue venue) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => VenueDetailScreen(venue: venue)),
-    );
+    showVenuePopup(context, venue);
   }
 
   String _calcDistance(Venue v) {
-    if (_currentPosition == null || v.latitude == null || v.longitude == null) return '';
+    if (v.latitude == null || v.longitude == null) return '';
+    final lat = _currentPosition?.latitude ?? 41.0370;
+    final lng = _currentPosition?.longitude ?? 28.9850;
     final d = Geolocator.distanceBetween(
-      _currentPosition!.latitude, _currentPosition!.longitude,
+      lat, lng,
       v.latitude!, v.longitude!,
     );
     if (d > 100000) return '';
@@ -140,22 +170,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
           children: [
             // ── 1. Header ──
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "İstanbul'u keşfet!",
-                  style: GoogleFonts.plusJakartaSans(
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: _onRefresh,
-                  child: Image.asset('assets/welcome/refresh.png', width: 22, height: 22),
-                ),
-              ],
+            Text(
+              "İstanbul'u keşfet!",
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 14),
 
@@ -177,9 +198,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
             const SizedBox(height: 16),
             _buildUstalaraSaygi(),
 
-            // ── 5. Content Guide: Platform Rehberi ──
             const SizedBox(height: 14),
-            _buildPlatformGuide(),
+            const AppFooter(),
 
             const SizedBox(height: 32),
           ],
@@ -212,8 +232,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
               child: Text(
                 _categories[i],
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
                   color: Colors.white,
                 ),
                 textAlign: TextAlign.center,
@@ -255,8 +274,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
           Text(
             'Ustalara saygı!',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
               color: const Color(0xFF1a1a1a),
             ),
           ),
@@ -264,8 +283,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
           Text(
             'Mehmet Yaşin ve Teoman Hünal — İstanbul Lezzet Durakları',
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
               color: const Color(0xFF1a1a1a),
             ),
           ),
@@ -274,7 +293,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
             "İstanbul'un zengin mutfak kültürünü keşfetmek denildiğinde akla gelen ilk isimlerden ikisi, gastronomi yazarı Mehmet Yaşin ve The North Shield Pub zincirinin kurucusu, içki kültürü uzmanı Teoman Hünal'dır.",
             style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
-              fontWeight: FontWeight.w400,
               color: const Color(0xFF1a1a1a).withValues(alpha: 0.8),
               height: 1.5,
             ),
@@ -284,7 +302,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
             'Lezzet Duraklarını AramaBul ile Keşfet!',
             style: GoogleFonts.plusJakartaSans(
               fontSize: 14,
-              fontWeight: FontWeight.w700,
               color: const Color(0xFF1a1a1a),
             ),
           ),
@@ -305,61 +322,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
         ],
       ),
-      ),
-    );
-  }
-
-  // ── Platform Guide ──
-  Widget _buildPlatformGuide() {
-    return Container(
-      decoration: BoxDecoration(
-        color: _kGuideBg,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            "İstanbul'da aradığın her şey burada!",
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF1a1a1a),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            "Aramabul, İstanbul'daki 29 binden fazla mekanı tek bir noktada toplayan yerel mekan keşif platformudur. Kategoriler, kullanıcı ihtiyacına göre; yeme-içme, gezi, hizmet, sağlık, kültür ve sanat başlıkları altında oluşturulmuştur.",
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 13,
-              height: 1.6,
-              color: const Color(0xFF1a1a1a).withValues(alpha: 0.8),
-            ),
-          ),
-          const SizedBox(height: 12),
-          _guideItem('Yeme-İçme', "İstanbul'un her köşesindeki restoranlar, meyhaneler, kafeler ve pastaneler gibi mekanları keşfedin."),
-          _guideItem('Gezi', 'Oteller, butik oteller, pansiyonlar ve kamp alanları gibi seçenekleri inceleyin.'),
-          _guideItem('Hizmetler', 'Kuaför, veteriner ve akaryakıt istasyonları gibi günlük yaşam hizmet noktalarını bulun.'),
-          _guideItem('Sağlık', 'Hastaneler, aile sağlık merkezleri ve eczaneler gibi sağlık kuruluşlarına ulaşın.'),
-          _guideItem('Kültür', 'Müzeler, tarihi camiler, saraylar ve arkeolojik alanları keşfedin.'),
-          _guideItem('Sanat', 'Tiyatrolar, galeriler, konser salonları ve etkinlik mekanlarını listeleyin.'),
-        ],
-      ),
-    );
-  }
-
-  Widget _guideItem(String title, String desc) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: RichText(
-        text: TextSpan(
-          style: GoogleFonts.plusJakartaSans(fontSize: 13, height: 1.5, color: const Color(0xFF1a1a1a).withValues(alpha: 0.8)),
-          children: [
-            TextSpan(text: '$title ', style: const TextStyle(fontWeight: FontWeight.w700)),
-            TextSpan(text: desc),
-          ],
-        ),
       ),
     );
   }
@@ -402,8 +364,8 @@ class _VenueCard extends StatelessWidget {
               child: Text(
                 venue.name,
                 style: GoogleFonts.plusJakartaSans(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                   color: const Color(0xFF1a1a1a),
                 ),
                 maxLines: 2,
@@ -443,7 +405,7 @@ class _VenueCard extends StatelessWidget {
                   if (venue.rating != null)
                     _InfoChip(
                       icon: Icons.star_rounded,
-                      iconColor: const Color(0xFF093826),
+                      iconColor: const Color(0xFFf59e0b),
                       label: '${venue.rating!.toStringAsFixed(1)}${venue.reviewCount != null ? ' (${_formatCount(venue.reviewCount!)})' : ''}',
                     ),
                 ],
@@ -459,8 +421,6 @@ class _VenueCard extends StatelessWidget {
     String? url;
     if (venue.imageUrl != null && venue.imageUrl!.isNotEmpty) {
       url = venue.imageUrl!.startsWith('http') ? venue.imageUrl! : 'https://aramabul.com${venue.imageUrl!}';
-    } else if (venue.slug != null && venue.slug!.isNotEmpty) {
-      url = 'https://aramabul.com/venue-photos/${venue.slug}.jpg';
     }
 
     if (url != null) {
@@ -478,12 +438,23 @@ class _VenueCard extends StatelessWidget {
   }
 
   Widget _imagePlaceholder({bool loading = false}) {
+    if (loading) {
+      return Container(
+        color: _kCatBg,
+        child: const Center(
+          child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54)),
+        ),
+      );
+    }
     return Container(
-      color: _kCatBg,
+      color: const Color(0xFFF1F5F9),
       child: Center(
-        child: loading
-            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54))
-            : Icon(_categoryIcon(), size: 40, color: Colors.white38),
+        child: Image.asset(
+          'assets/no_image.png',
+          width: 48,
+          height: 48,
+          fit: BoxFit.contain,
+        ),
       ),
     );
   }
@@ -531,8 +502,7 @@ class _TagChip extends StatelessWidget {
       child: Text(
         label,
         style: GoogleFonts.plusJakartaSans(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+          fontSize: 14,
           color: const Color(0xFF093826),
         ),
       ),
@@ -567,8 +537,7 @@ class _InfoChip extends StatelessWidget {
           Text(
             label,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
+              fontSize: 14,
               color: const Color(0xFF093826),
             ),
           ),
@@ -600,12 +569,52 @@ class _InfoImageChip extends StatelessWidget {
           Text(
             label,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
+              fontSize: 14,
               color: const Color(0xFF093826),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Haritalarda Aç Chip — customized Google Maps blue color (#1a73e7)
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _MapsChip extends StatelessWidget {
+  final VoidCallback onTap;
+  const _MapsChip({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8FDF0), // soft green background
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFB5F4CD), width: 0.8), // light green border
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset('assets/welcome/detail.png', width: 16, height: 16),
+            const SizedBox(width: 5),
+            Text(
+              'Ayrıntılı Bilgi',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 14,
+                color: const Color(0xFF0D8A43), // emerald green text
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -649,9 +658,11 @@ class _CategoryResultsPageState extends State<_CategoryResultsPage> {
   }
 
   String _calcDistance(Venue v) {
-    if (widget.currentPosition == null || v.latitude == null || v.longitude == null) return '';
+    if (v.latitude == null || v.longitude == null) return '';
+    final lat = widget.currentPosition?.latitude ?? 41.0370;
+    final lng = widget.currentPosition?.longitude ?? 28.9850;
     final d = Geolocator.distanceBetween(
-      widget.currentPosition!.latitude, widget.currentPosition!.longitude,
+      lat, lng,
       v.latitude!, v.longitude!,
     );
     if (d > 100000) return '';
@@ -664,7 +675,7 @@ class _CategoryResultsPageState extends State<_CategoryResultsPage> {
     return Scaffold(
       backgroundColor: _kBg,
       appBar: AppBar(
-        title: Text(widget.category, style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.w600)),
+        title: Text(widget.category, style: GoogleFonts.plusJakartaSans()),
         backgroundColor: _kBg,
         foregroundColor: Colors.white,
         elevation: 0,
@@ -675,7 +686,7 @@ class _CategoryResultsPageState extends State<_CategoryResultsPage> {
               ? Center(
                   child: Text(
                     'Bu kategoride mekan bulunamadı',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 16),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 14),
                   ),
                 )
               : ListView.builder(
@@ -686,9 +697,7 @@ class _CategoryResultsPageState extends State<_CategoryResultsPage> {
                     return _VenueCard(
                       venue: v,
                       distance: _calcDistance(v),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => VenueDetailScreen(venue: v)),
-                      ),
+                      onTap: () => showVenuePopup(context, v),
                     );
                   },
                 ),

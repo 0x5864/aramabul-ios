@@ -20,6 +20,7 @@ class Venue {
   final String? instagram;
   final String? budget;
   final String? editorialSummary;
+  final String? source;
   final bool isFavorite;
 
   const Venue({
@@ -43,6 +44,7 @@ class Venue {
     this.instagram,
     this.budget,
     this.editorialSummary,
+    this.source,
     this.isFavorite = false,
   });
 
@@ -66,12 +68,13 @@ class Venue {
           : json['userRatingCount'] is int
               ? json['userRatingCount']
               : int.tryParse('${json['reviewCount'] ?? json['review_count'] ?? json['userRatingCount'] ?? ''}'),
-      imageUrl: json['imageUrl']?.toString() ?? json['image_url']?.toString() ?? json['photoUri']?.toString(),
+      imageUrl: _parseImageUrl(json),
       slug: json['slug']?.toString(),
       neighborhood: json['neighborhood']?.toString(),
       instagram: json['instagram']?.toString(),
       budget: json['budget']?.toString(),
       editorialSummary: json['editorialSummary']?.toString(),
+      source: json['source']?.toString(),
     );
   }
 
@@ -97,6 +100,7 @@ class Venue {
       instagram: instagram,
       budget: budget,
       editorialSummary: editorialSummary,
+      source: source ?? this.source,
       isFavorite: isFavorite ?? this.isFavorite,
     );
   }
@@ -122,7 +126,25 @@ class Venue {
     'instagram': instagram,
     'budget': budget,
     'editorialSummary': editorialSummary,
+    'source': source,
   };
+
+  static String? _parseImageUrl(Map<String, dynamic> json) {
+    final paths = [
+      json['imageUrl'],
+      json['image_url'],
+      json['photoUri'],
+    ];
+    for (var path in paths) {
+      if (path != null) {
+        final str = path.toString().trim();
+        if (str.isNotEmpty && str != 'null') {
+          return str;
+        }
+      }
+    }
+    return null;
+  }
 
   static double? _parseDouble(dynamic v) {
     if (v == null) return null;

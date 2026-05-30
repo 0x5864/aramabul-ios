@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 
 import '../models/venue.dart';
 import '../services/venue_service.dart';
+import '../widgets/maps_sheet.dart';
 
 /// Native venue detail screen — shows venue information
 /// without relying on WebView. Key native screen for
@@ -103,70 +104,11 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
   }
 
   void _openDirections() {
-    if (_venue.latitude == null || _venue.longitude == null) {
-      if (_venue.mapsUrl != null && _venue.mapsUrl!.isNotEmpty) {
-        launchUrl(Uri.parse(_venue.mapsUrl!),
-            mode: LaunchMode.externalApplication);
-      }
-      return;
-    }
-    final lat = _venue.latitude!;
-    final lng = _venue.longitude!;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF0d2137),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text('Yol Tarifi',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w600,
-                  )),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.map_rounded, color: Colors.white),
-                title: const Text('Apple Haritalar',
-                    style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(context);
-                  launchUrl(
-                    Uri.parse('https://maps.apple.com/?daddr=$lat,$lng'),
-                    mode: LaunchMode.externalApplication,
-                  );
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.directions_rounded, color: Colors.white),
-                title: const Text('Google Maps',
-                    style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(context);
-                  launchUrl(
-                    Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'),
-                    mode: LaunchMode.externalApplication,
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
+    showMapsSheet(
+      context,
+      lat: _venue.latitude,
+      lng: _venue.longitude,
+      mapsUrl: _venue.mapsUrl,
     );
   }
 
@@ -212,48 +154,54 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
             backgroundColor: const Color(0xFF094174),
             foregroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
-              background: _venue.imageUrl != null && _venue.imageUrl!.isNotEmpty
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        Image.network(
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  _venue.imageUrl != null && _venue.imageUrl!.isNotEmpty
+                      ? Image.network(
                           _resolveImageUrl(_venue.imageUrl!),
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
-                            color: const Color(0xFF094174),
-                            child: const Icon(
-                              Icons.place_rounded,
-                              color: Colors.white38,
-                              size: 80,
+                            color: const Color(0xFFF1F5F9),
+                            child: Center(
+                              child: Image.asset(
+                                'assets/no_image.png',
+                                width: 80,
+                                height: 80,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: const Color(0xFFF1F5F9),
+                          child: Center(
+                            child: Image.asset(
+                              'assets/no_image.png',
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.contain,
                             ),
                           ),
                         ),
-                        // Multi-stop gradient for better text readability
-                        const DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Color(0x66000000),
-                                Colors.transparent,
-                                Color(0x33000000),
-                                Color(0xDD000000),
-                              ],
-                              stops: [0.0, 0.25, 0.6, 1.0],
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : Container(
-                      color: const Color(0xFF094174),
-                      child: const Icon(
-                        Icons.place_rounded,
-                        color: Colors.white38,
-                        size: 80,
+                  // Multi-stop gradient for better text readability
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x66000000),
+                          Colors.transparent,
+                          Color(0x33000000),
+                          Color(0xDD000000),
+                        ],
+                        stops: [0.0, 0.25, 0.6, 1.0],
                       ),
                     ),
+                  ),
+                ],
+              ),
             ),
             actions: [
               // Favorite button
@@ -285,8 +233,8 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                   Text(
                     _venue.name,
                     style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
@@ -433,8 +381,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
           const Text(
             'Bilgiler',
             style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+              fontSize: 14,
               color: Color(0xFF1a1a1a),
             ),
           ),
@@ -454,8 +401,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
                           Text(
                             detail.label,
                             style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                              fontSize: 14,
                               color: const Color(0xFF1a1a1a)
                                   .withValues(alpha: 0.5),
                             ),
@@ -555,7 +501,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: const Color(0xFF7bbce8), width: 1),
       ),
-      child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF093826))),
+      child: Text(label, style: const TextStyle(fontSize: 14, color: Color(0xFF093826))),
     );
   }
 
@@ -572,7 +518,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
         children: [
           Icon(icon, size: 14, color: iconColor ?? const Color(0xFF093826)),
           const SizedBox(width: 4),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF093826))),
+          Text(label, style: const TextStyle(fontSize: 14, color: Color(0xFF093826))),
         ],
       ),
     );
@@ -591,7 +537,7 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
         children: [
           Image.asset(assetPath, width: 16, height: 16),
           const SizedBox(width: 5),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF093826))),
+          Text(label, style: const TextStyle(fontSize: 14, color: Color(0xFF093826))),
         ],
       ),
     );
@@ -628,13 +574,13 @@ class _VenueDetailScreenState extends State<VenueDetailScreen> {
           'Benzer Mekanlar',
           style: TextStyle(
             fontSize: 18,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 190,
+          height: 210,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: _similarVenues.length,
@@ -689,13 +635,27 @@ class _SimilarVenueCard extends StatelessWidget {
                       venue.imageUrl!.startsWith('http') ? venue.imageUrl! : 'https://aramabul.com${venue.imageUrl!}',
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) => Container(
-                        color: const Color(0xFF094174),
-                        child: const Icon(Icons.place_rounded, color: Colors.white38, size: 36),
+                        color: const Color(0xFFF1F5F9),
+                        child: Center(
+                          child: Image.asset(
+                            'assets/no_image.png',
+                            width: 32,
+                            height: 32,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
                       ),
                     )
                   : Container(
-                      color: const Color(0xFF094174),
-                      child: const Icon(Icons.place_rounded, color: Colors.white38, size: 36),
+                      color: const Color(0xFFF1F5F9),
+                      child: Center(
+                        child: Image.asset(
+                          'assets/no_image.png',
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
                     ),
             ),
             // Venue info
@@ -709,7 +669,11 @@ class _SimilarVenueCard extends StatelessWidget {
                       venue.name,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF0a3d6b)),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0a3d6b),
+                      ),
                     ),
                     const SizedBox(height: 2),
                     if (venue.district != null || venue.neighborhood != null)
@@ -721,7 +685,7 @@ class _SimilarVenueCard extends StatelessWidget {
                         ].where((s) => s != null && s.isNotEmpty).join(', '),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 10, color: const Color(0xFF0a3d6b).withValues(alpha: 0.6)),
+                        style: TextStyle(fontSize: 14, color: const Color(0xFF0a3d6b).withValues(alpha: 0.6)),
                       ),
                     const Spacer(),
                     if (venue.rating != null)
@@ -729,7 +693,7 @@ class _SimilarVenueCard extends StatelessWidget {
                         children: [
                           const Icon(Icons.star_rounded, color: Color(0xFFf59e0b), size: 13),
                           const SizedBox(width: 2),
-                          Text(venue.rating!.toStringAsFixed(1), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0a3d6b))),
+                          Text(venue.rating!.toStringAsFixed(1), style: const TextStyle(fontSize: 14, color: Color(0xFF0a3d6b))),
                         ],
                       ),
                   ],
@@ -777,8 +741,7 @@ class _ActionButton extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontSize: 14,
                 color: color,
               ),
             ),

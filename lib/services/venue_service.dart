@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/venue.dart';
+import 'app_review_helper.dart';
 
 /// Manages favorites locally and venue API calls.
 class VenueService {
@@ -75,6 +76,7 @@ class VenueService {
       await removeFavorite(venue.id);
     } else {
       await addFavorite(venue);
+      AppReviewHelper.recordSignificantAction();
     }
   }
 

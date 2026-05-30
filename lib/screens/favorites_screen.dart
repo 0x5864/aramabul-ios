@@ -6,6 +6,9 @@ import 'package:share_plus/share_plus.dart';
 import '../models/venue.dart';
 import '../services/venue_service.dart';
 import 'venue_detail_screen.dart';
+import '../widgets/app_footer.dart';
+import '../widgets/maps_sheet.dart';
+import '../widgets/venue_dialog.dart';
 
 /// Native favorites screen — shows locally saved venues.
 /// Works fully offline, providing value beyond the WebView.
@@ -58,12 +61,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   void _openVenueDetail(Venue venue) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => VenueDetailScreen(venue: venue),
-      ),
-    ).then((_) => _loadFavorites()); // refresh in case favorite was toggled
+    showVenuePopup(context, venue);
   }
 
   void _shareVenue(Venue venue) {
@@ -81,59 +79,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   void _openDirections(Venue venue) {
-    if (venue.latitude == null || venue.longitude == null) {
-      if (venue.mapsUrl != null && venue.mapsUrl!.isNotEmpty) {
-        launchUrl(Uri.parse(venue.mapsUrl!), mode: LaunchMode.externalApplication);
-      }
-      return;
-    }
-    final lat = venue.latitude!;
-    final lng = venue.longitude!;
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF0d2137),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text('Yol Tarifi',
-                  style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.map_rounded, color: Colors.white),
-                title: const Text('Apple Haritalar', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(context);
-                  launchUrl(Uri.parse('https://maps.apple.com/?daddr=$lat,$lng'),
-                      mode: LaunchMode.externalApplication);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.directions_rounded, color: Colors.white),
-                title: const Text('Google Maps', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(context);
-                  launchUrl(Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'),
-                      mode: LaunchMode.externalApplication);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
+    showMapsSheet(
+      context,
+      lat: venue.latitude,
+      lng: venue.longitude,
+      mapsUrl: venue.mapsUrl,
     );
   }
 
@@ -148,21 +98,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             // Breadcrumb header
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Anasayfa  /  Favorilerim',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withValues(alpha: 0.8),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: _loadFavorites,
-                    child: Image.asset('assets/welcome/refresh.png', width: 22, height: 22),
-                  ),
-                ],
+              child: Text(
+                'Anasayfa  /  Favorilerim',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
               ),
             ),
 
@@ -183,16 +124,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Widget _buildEmptyState() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Favori mekanların\nburada görünecek',
             style: const TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
+              fontSize: 14,
               color: Colors.white,
               height: 1.2,
             ),
@@ -201,7 +141,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           Text(
             'Yeme-İçme ekranından mekan\nkaydetmeye başlayabilirsin.',
             style: TextStyle(
-              fontSize: 16,
+              fontSize: 14,
               color: Colors.white.withValues(alpha: 0.75),
               height: 1.5,
             ),
@@ -215,56 +155,56 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     return RefreshIndicator(
       color: const Color(0xFF094174),
       onRefresh: _loadFavorites,
-      child: ListView.builder(
+      child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        itemCount: _favorites.length,
-        itemBuilder: (context, index) {
-          final venue = _favorites[index];
-          return Dismissible(
-            key: ValueKey(venue.id),
-            direction: DismissDirection.endToStart,
-            background: Container(
-              alignment: Alignment.centerRight,
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.only(right: 24),
-              decoration: BoxDecoration(
-                color: const Color(0xFFe74c3c),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.delete_rounded, color: Colors.white, size: 28),
-                  SizedBox(height: 4),
-                  Text(
-                    'Sil',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+        children: [
+          ...List.generate(_favorites.length, (index) {
+            final venue = _favorites[index];
+            return Dismissible(
+              key: ValueKey(venue.id),
+              direction: DismissDirection.endToStart,
+              background: Container(
+                alignment: Alignment.centerRight,
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.only(right: 24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFe74c3c),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.delete_rounded, color: Colors.white, size: 28),
+                    SizedBox(height: 4),
+                    Text(
+                      'Sil',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            confirmDismiss: (direction) async {
-              return true;
-            },
-            onDismissed: (direction) {
-              _removeFavorite(venue);
-            },
-            child: _FavoriteCard(
-              venue: venue,
-              onRemove: () => _removeFavorite(venue),
-              onTap: () => _openVenueDetail(venue),
-              onShare: () => _shareVenue(venue),
-              onCall: venue.phone != null && venue.phone!.isNotEmpty
-                  ? () => _callVenue(venue)
-                  : null,
-              onDirections: () => _openDirections(venue),
-            ),
-          );
-        },
+              confirmDismiss: (direction) async {
+                return true;
+              },
+              onDismissed: (direction) {
+                _removeFavorite(venue);
+              },
+              child: _FavoriteCard(
+                venue: venue,
+                onRemove: () => _removeFavorite(venue),
+                onTap: () => _openVenueDetail(venue),
+                onShare: () => _shareVenue(venue),
+                onCall: venue.phone != null && venue.phone!.isNotEmpty
+                    ? () => _callVenue(venue)
+                    : null,
+                onDirections: () => _openDirections(venue),
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
@@ -321,17 +261,36 @@ class _FavoriteCard extends StatelessWidget {
                               width: 56,
                               height: 56,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.place_rounded,
-                                color: Color(0xFF094174),
-                                size: 28,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 56,
+                                height: 56,
+                                color: const Color(0xFFF1F5F9),
+                                child: Center(
+                                  child: Image.asset(
+                                    'assets/no_image.png',
+                                    width: 24,
+                                    height: 24,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
                               ),
                             ),
                           )
-                        : const Icon(
-                            Icons.place_rounded,
-                            color: Color(0xFF094174),
-                            size: 28,
+                        : Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Center(
+                              child: Image.asset(
+                                'assets/no_image.png',
+                                width: 24,
+                                height: 24,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
                           ),
                   ),
                   const SizedBox(width: 12),
@@ -344,8 +303,8 @@ class _FavoriteCard extends StatelessWidget {
                         Text(
                           venue.name,
                           style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                             color: Color(0xFF1a1a1a),
                           ),
                           maxLines: 2,
@@ -358,7 +317,7 @@ class _FavoriteCard extends StatelessWidget {
                                 .where((s) => s != null && s.isNotEmpty)
                                 .join(', '),
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 14,
                               color: const Color(0xFF1a1a1a).withValues(alpha: 0.6),
                             ),
                           ),
@@ -371,8 +330,7 @@ class _FavoriteCard extends StatelessWidget {
                               Text(
                                 venue.rating!.toStringAsFixed(1),
                                 style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
                                   color: Color(0xFF1a1a1a),
                                 ),
                               ),
@@ -381,7 +339,7 @@ class _FavoriteCard extends StatelessWidget {
                                 Text(
                                   '(${venue.reviewCount})',
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 14,
                                     color: const Color(0xFF1a1a1a).withValues(alpha: 0.5),
                                   ),
                                 ),
@@ -472,8 +430,7 @@ class _QuickAction extends StatelessWidget {
             Text(
               label,
               style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+                fontSize: 14,
                 color: Color(0xFF094174),
               ),
             ),

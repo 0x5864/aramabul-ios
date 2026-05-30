@@ -105,9 +105,16 @@
       const distanceText = formatDistance(Number(item.distanceMeters));
       eyebrow.textContent = [item.district, item.neighborhood, distanceText].filter(Boolean).join(" / ");
       titleLink.textContent = item.name || "İsimsiz mekan";
-      titleLink.href = buildDetailUrl(item.slug);
+      titleLink.href = "#";
+      titleLink.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (typeof window.openVenuePopup === "function") {
+          window.openVenuePopup(item);
+        }
+      });
       address.textContent = item.address || "Adres bilgisi bulunmuyor.";
-      rating.textContent = formatVenueRatingText(item.rating, item.userRatingCount);
+      rating.textContent = "";
+      rating.hidden = true;
       budget.textContent = formatBudgetLabel(item.budget) || "Bütçe yok";
 
       if (item.mapsUrl) {

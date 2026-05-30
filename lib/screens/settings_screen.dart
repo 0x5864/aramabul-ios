@@ -21,6 +21,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoggedIn = false;
+  String _userEmail = '';
 
   @override
   void initState() {
@@ -35,6 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     setState(() {
       _isLoggedIn = name.isNotEmpty && email.isNotEmpty;
+      _userEmail = email;
     });
   }
 
@@ -49,27 +51,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = _isLoggedIn && (
+      _userEmail.toLowerCase() == 'admin@aramabul.com' ||
+      _userEmail.toLowerCase().startsWith('admin@') ||
+      _userEmail.toLowerCase().endsWith('.admin')
+    );
+    final showAdminRow = _isLoggedIn && isAdmin;
+
     return Scaffold(
       backgroundColor: const Color(0xFF094174),
       body: SafeArea(
         child: Column(
           children: [
-            // Refresh icon
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  GestureDetector(
-                    onTap: () => setState(() {}),
-                    child: Image.asset('assets/welcome/refresh.png', width: 22, height: 22),
-                  ),
-                ],
-              ),
-            ),
             // Menu card
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: Card(
                 color: Colors.white,
                 elevation: 0,
@@ -128,15 +124,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         MaterialPageRoute(builder: (_) => const AboutScreen()),
                       ),
                     ),
-                    _divider(),
-                    _menuRow(
-                      icon: Icons.admin_panel_settings_outlined,
-                      label: 'Admin Girişi',
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
+                    if (showAdminRow) ...[
+                      _divider(),
+                      _menuRow(
+                        icon: Icons.admin_panel_settings_outlined,
+                        label: 'Admin Girişi',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
+                          );
+                        },
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -163,9 +163,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: const Text(
                       'Çıkış yap',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                        fontSize: 14,
+                        ),
                     ),
                   ),
                 ),
@@ -193,8 +192,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Text(
                 label,
                 style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
                   color: Color(0xFF1a1a1a),
                 ),
               ),

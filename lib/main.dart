@@ -58,8 +58,34 @@ class AramaBulApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF094174)),
         scaffoldBackgroundColor: const Color(0xFF094174),
+        hoverColor: const Color(0xFFe8f4fd),
+        splashColor: const Color(0xFFd0e8f9),
+        highlightColor: const Color(0xFFe8f4fd),
+        appBarTheme: AppBarTheme(
+          titleTextStyle: GoogleFonts.plusJakartaSans(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
         textTheme: GoogleFonts.plusJakartaSansTextTheme(
-          ThemeData.dark().textTheme,
+          ThemeData.dark().textTheme.copyWith(
+            displayLarge: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            displayMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            displaySmall: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            headlineLarge: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            headlineMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            headlineSmall: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            titleLarge: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            titleMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            titleSmall: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            bodyLarge: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            bodyMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            bodySmall: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            labelLarge: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            labelMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+            labelSmall: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+          ),
         ),
       ),
       home: const AppEntryPoint(),
@@ -355,6 +381,10 @@ class TabShell extends StatefulWidget {
 class _TabShellState extends State<TabShell> {
   int _currentIndex = 0;
 
+  final GlobalKey<NavigatorState> _exploreNavigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<NavigatorState> _searchNavigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<NavigatorState> _favoritesNavigatorKey = GlobalKey<NavigatorState>();
+
   // AdMob banner
   BannerAd? _bannerAd;
   bool _isBannerLoaded = false;
@@ -405,9 +435,24 @@ class _TabShellState extends State<TabShell> {
         child: IndexedStack(
           index: _currentIndex,
           children: [
-            const ExploreScreen(),
-            const SearchScreen(),
-            const FavoritesScreen(),
+            Navigator(
+              key: _exploreNavigatorKey,
+              onGenerateRoute: (settings) => MaterialPageRoute(
+                builder: (_) => const ExploreScreen(),
+              ),
+            ),
+            Navigator(
+              key: _searchNavigatorKey,
+              onGenerateRoute: (settings) => MaterialPageRoute(
+                builder: (_) => const SearchScreen(),
+              ),
+            ),
+            Navigator(
+              key: _favoritesNavigatorKey,
+              onGenerateRoute: (settings) => MaterialPageRoute(
+                builder: (_) => const FavoritesScreen(),
+              ),
+            ),
             SettingsScreen(onSignOut: _goToWelcome),
           ],
         ),
@@ -432,19 +477,37 @@ class _TabShellState extends State<TabShell> {
                       assetPath: 'assets/welcome/ev.png',
                       label: 'Ana Sayfa',
                       isActive: _currentIndex == 0,
-                      onTap: () => setState(() => _currentIndex = 0),
+                      onTap: () {
+                        if (_currentIndex == 0) {
+                          _exploreNavigatorKey.currentState?.popUntil((route) => route.isFirst);
+                        } else {
+                          setState(() => _currentIndex = 0);
+                        }
+                      },
                     ),
                     _NavItem(
                       icon: Icons.search_rounded,
                       label: 'Ara',
                       isActive: _currentIndex == 1,
-                      onTap: () => setState(() => _currentIndex = 1),
+                      onTap: () {
+                        if (_currentIndex == 1) {
+                          _searchNavigatorKey.currentState?.popUntil((route) => route.isFirst);
+                        } else {
+                          setState(() => _currentIndex = 1);
+                        }
+                      },
                     ),
                     _NavItem(
                       assetPath: 'assets/welcome/fav.png',
                       label: 'Favoriler',
                       isActive: _currentIndex == 2,
-                      onTap: () => setState(() => _currentIndex = 2),
+                      onTap: () {
+                        if (_currentIndex == 2) {
+                          _favoritesNavigatorKey.currentState?.popUntil((route) => route.isFirst);
+                        } else {
+                          setState(() => _currentIndex = 2);
+                        }
+                      },
                     ),
                     _NavItem(
                       assetPath: 'assets/welcome/ayar.png',
@@ -522,8 +585,7 @@ class _NavItem extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                fontSize: 14,
                 color: color,
               ),
             ),

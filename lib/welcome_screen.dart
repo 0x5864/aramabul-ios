@@ -176,8 +176,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             Text(
                               _t['hello']!,
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 42,
-                                fontWeight: FontWeight.w300,
+                                fontSize: 14,
                                 color: Colors.white,
                                 letterSpacing: -0.5,
                                 height: 1.1,
@@ -187,8 +186,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             Text(
                               _t['subtitle']!,
                               style: GoogleFonts.plusJakartaSans(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w300,
+                                fontSize: 14,
                                 color: _kLightBlue.withValues(alpha: 0.9),
                                 height: 1.4,
                               ),
@@ -223,7 +221,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       _t['login']!,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 14,
                         color: _kLightBlue.withValues(alpha: 0.45),
                       ),
                     ),
@@ -236,8 +234,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       child: Text(
                         _t['skip']!,
                         style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
                           color: _kAccentBlue,
                         ),
                       ),
@@ -254,7 +251,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             _t['policy']!,
                             textAlign: TextAlign.center,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 14,
                               color: Colors.white.withValues(alpha: 0.35),
                               height: 1.5,
                             ),
@@ -379,8 +376,7 @@ class _ActionButton extends StatelessWidget {
               Text(
                 label,
                 style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
                   color: Colors.white,
                   letterSpacing: 0.3,
                 ),
@@ -496,10 +492,9 @@ class _PolicyLink extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 13,
+          fontSize: 14,
           color: _kAccentBlue.withValues(alpha: 0.8),
-          fontWeight: FontWeight.w500,
-        ),
+          ),
       ),
     );
   }
@@ -542,8 +537,7 @@ class _LangChip extends StatelessWidget {
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              fontSize: 14,
               color: isSelected
                   ? Colors.white
                   : Colors.white.withValues(alpha: 0.7),

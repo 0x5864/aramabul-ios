@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/venue.dart';
 import '../services/venue_service.dart';
 import 'venue_detail_screen.dart';
+import '../widgets/app_footer.dart';
+import '../widgets/venue_dialog.dart';
 
 // ─── Colors matching WebView ──────────────────────────────
 const _kBg = Color(0xFF094174);
@@ -81,9 +83,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _openVenueDetail(Venue venue) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => VenueDetailScreen(venue: venue)),
-    );
+    showVenuePopup(context, venue);
   }
 
   @override
@@ -93,22 +93,9 @@ class _SearchScreenState extends State<SearchScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  GestureDetector(
-                    onTap: () => setState(() { _results = []; _hasSearched = false; _searchController.clear(); }),
-                    child: Image.asset('assets/welcome/refresh.png', width: 22, height: 22),
-                  ),
-                ],
-              ),
-            ),
-
             // ── Search Bar (matching WebView: "Ne bulmamı istersin?" + "Bul") ──
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.only(left: 14, right: 14, top: 16),
               child: Row(
                 children: [
                   // Text field
@@ -123,7 +110,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         focusNode: _focusNode,
                         onSubmitted: _performSearch,
                         textInputAction: TextInputAction.search,
-                        style: GoogleFonts.plusJakartaSans(fontSize: 15, color: const Color(0xFF1a1a1a)),
+                        style: GoogleFonts.plusJakartaSans(fontSize: 14, color: const Color(0xFF1a1a1a)),
                         decoration: InputDecoration(
                           hintText: 'Ne bulmamı istersin?',
                           hintStyle: GoogleFonts.plusJakartaSans(
@@ -162,8 +149,7 @@ class _SearchScreenState extends State<SearchScreen> {
                       child: Text(
                         'Bul',
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
                           color: Colors.white,
                         ),
                       ),
@@ -181,7 +167,30 @@ class _SearchScreenState extends State<SearchScreen> {
                   ? const Center(child: CircularProgressIndicator(color: _kChipBorder, strokeWidth: 2.5))
                   : _hasSearched
                       ? _buildResults()
-                      : const SizedBox.shrink(), // Empty like WebView
+                      : Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.search_rounded, size: 56, color: Colors.white.withValues(alpha: 0.3)),
+                              const SizedBox(height: 12),
+                              Text(
+                                "İstanbul'daki mekanları keşfet!",
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14,
+                                  color: Colors.white70,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                "Mutfak, kategori veya ilçe araması yapabilirsiniz.",
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 14,
+                                  color: Colors.white38,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
             ),
           ],
         ),
@@ -199,7 +208,7 @@ class _SearchScreenState extends State<SearchScreen> {
             const SizedBox(height: 16),
             Text(
               'Sonuç bulunamadı',
-              style: GoogleFonts.plusJakartaSans(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.8)),
+              style: GoogleFonts.plusJakartaSans(fontSize: 14, color: Colors.white.withValues(alpha: 0.8)),
             ),
             const SizedBox(height: 8),
             Text(
@@ -211,13 +220,14 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-      itemCount: _results.length,
-      itemBuilder: (_, i) {
-        final venue = _results[i];
-        return _SearchResultCard(venue: venue, onTap: () => _openVenueDetail(venue));
-      },
+      children: [
+        ..._results.map((venue) => _SearchResultCard(
+              venue: venue,
+              onTap: () => _openVenueDetail(venue),
+            )),
+      ],
     );
   }
 }
@@ -261,7 +271,11 @@ class _SearchResultCard extends StatelessWidget {
                 children: [
                   Text(
                     venue.name,
-                    style: GoogleFonts.plusJakartaSans(fontSize: 15, fontWeight: FontWeight.w600, color: const Color(0xFF1a1a1a)),
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF1a1a1a),
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -270,7 +284,7 @@ class _SearchResultCard extends StatelessWidget {
                     [venue.category, venue.district, venue.city]
                         .where((s) => s != null && s.isNotEmpty)
                         .join(' · '),
-                    style: TextStyle(fontSize: 12, color: const Color(0xFF1a1a1a).withValues(alpha: 0.5)),
+                    style: TextStyle(fontSize: 14, color: const Color(0xFF1a1a1a).withValues(alpha: 0.5)),
                     maxLines: 1,
                   ),
                   if (venue.rating != null) ...[
@@ -281,13 +295,13 @@ class _SearchResultCard extends StatelessWidget {
                         const SizedBox(width: 3),
                         Text(
                           venue.rating!.toStringAsFixed(1),
-                          style: GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF1a1a1a)),
+                          style: GoogleFonts.plusJakartaSans(fontSize: 14, color: const Color(0xFF1a1a1a)),
                         ),
                         if (venue.reviewCount != null) ...[
                           const SizedBox(width: 4),
                           Text(
                             '(${venue.reviewCount})',
-                            style: TextStyle(fontSize: 11, color: const Color(0xFF1a1a1a).withValues(alpha: 0.4)),
+                            style: TextStyle(fontSize: 14, color: const Color(0xFF1a1a1a).withValues(alpha: 0.4)),
                           ),
                         ],
                       ],
@@ -320,8 +334,15 @@ class _SearchResultCard extends StatelessWidget {
 
   Widget _placeholder() {
     return Container(
-      color: const Color(0xFF094174).withValues(alpha: 0.3),
-      child: const Icon(Icons.place_rounded, color: Color(0xFF094174), size: 28),
+      color: const Color(0xFFF1F5F9),
+      child: Center(
+        child: Image.asset(
+          'assets/no_image.png',
+          width: 48,
+          height: 48,
+          fit: BoxFit.contain,
+        ),
+      ),
     );
   }
 }
