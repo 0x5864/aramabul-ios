@@ -2,7 +2,7 @@ name: aramabul_ios
 description: "AramaBul – Turkey venue discovery app. Fully native Flutter (iOS)."
 publish_to: 'none'
 
-version: 1.1.0+22
+version: 1.1.1+23
 
 environment:
   sdk: ^3.11.5

@@ -392,8 +392,24 @@ class _TabShellState extends State<TabShell> {
   @override
   void initState() {
     super.initState();
+    _requestATTAndLoadAd();
+  }
+
+  /// Request App Tracking Transparency permission, then load banner ad.
+  Future<void> _requestATTAndLoadAd() async {
+    // Wait for first frame so the ATT dialog shows properly
+    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final status = await AppTrackingTransparency.requestTrackingAuthorization();
+      debugPrint('[ATT] Tracking status: $status');
+    } catch (e) {
+      debugPrint('[ATT] Error: $e');
+    }
     _loadBannerAd();
   }
+
+  int _bannerRetryCount = 0;
+  static const int _maxBannerRetries = 3;
 
   void _loadBannerAd() {
     _bannerAd = BannerAd(
@@ -402,12 +418,23 @@ class _TabShellState extends State<TabShell> {
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (ad) {
+          debugPrint('[AdMob] Banner loaded successfully');
+          _bannerRetryCount = 0;
           if (mounted) setState(() => _isBannerLoaded = true);
         },
         onAdFailedToLoad: (ad, error) {
-          debugPrint('[AdMob] Banner failed: $error');
+          debugPrint('[AdMob] Banner failed: $error (attempt ${_bannerRetryCount + 1})');
           ad.dispose();
           _bannerAd = null;
+          // Retry with exponential backoff
+          if (_bannerRetryCount < _maxBannerRetries) {
+            _bannerRetryCount++;
+            final delay = Duration(seconds: _bannerRetryCount * 10);
+            debugPrint('[AdMob] Retrying in ${delay.inSeconds}s...');
+            Future.delayed(delay, () {
+              if (mounted) _loadBannerAd();
+            });
+          }
         },
       ),
     )..load();
