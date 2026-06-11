@@ -1,48 +1,36 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:app_tracking_transparency/app_tracking_transparency.dart';
-
-import 'welcome_screen.dart';
-import 'screens/explore_screen.dart';
-import 'screens/search_screen.dart';
-import 'screens/favorites_screen.dart';
-import 'screens/settings_screen.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import 'package:share_plus/share_plus.dart';
 
 // ---------------------------------------------------------------------------
 // Configuration
 // ---------------------------------------------------------------------------
 
-/// Live URL — used only for deep links and API base.
 const String kLiveUrl = 'https://aramabul.com';
+const String kDeepLinkHost = 'aramabul.com';
+const String kDeepLinkHostWww = 'www.aramabul.com';
 
-/// App version string.
-const String kAppVersion = '1.0.1';
+const String kAppVersion = '1.2.0';
 
-const String _kWelcomeSeenKey = 'welcome_seen';
+const Color kAppBackgroundColor = Colors.white;
+const Color kAppProgressColor = Color(0xFFE30A17);
 
-/// Global app language selected on welcome screen (e.g. 'TR', 'EN', 'DE', 'RU')
-// ignore: unused_element
-String _globalAppLanguage = 'TR';
+const String _kNativeUsersKey = 'native_auth_users';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialize AdMob SDK
-  await MobileAds.instance.initialize();
-  // Load saved language
-  final prefs = await SharedPreferences.getInstance();
-  final savedLang = prefs.getString('app_language');
-  if (savedLang != null && savedLang.isNotEmpty) {
-    _globalAppLanguage = savedLang.toUpperCase();
-  }
   runApp(const AramaBulApp());
 }
 
@@ -61,562 +49,756 @@ class AramaBulApp extends StatelessWidget {
         hoverColor: const Color(0xFFe8f4fd),
         splashColor: const Color(0xFFd0e8f9),
         highlightColor: const Color(0xFFe8f4fd),
-        appBarTheme: AppBarTheme(
-          titleTextStyle: GoogleFonts.plusJakartaSans(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
         textTheme: GoogleFonts.plusJakartaSansTextTheme(
-          ThemeData.dark().textTheme.copyWith(
-            displayLarge: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            displayMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            displaySmall: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            headlineLarge: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            headlineMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            headlineSmall: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            titleLarge: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            titleMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            titleSmall: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            bodyLarge: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            bodyMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            bodySmall: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            labelLarge: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            labelMedium: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-            labelSmall: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
-          ),
+          ThemeData.dark().textTheme,
         ),
       ),
-      home: const AppEntryPoint(),
+      home: const HomeWebViewPage(),
     );
   }
 }
 
-/// Decides whether to show the welcome screen or go directly to the app.
-class AppEntryPoint extends StatefulWidget {
-  const AppEntryPoint({super.key});
+class HomeWebViewPage extends StatefulWidget {
+  final String? initialPath;
+
+  const HomeWebViewPage({super.key, this.initialPath});
 
   @override
-  State<AppEntryPoint> createState() => _AppEntryPointState();
+  State<HomeWebViewPage> createState() => _HomeWebViewPageState();
 }
 
-class _AppEntryPointState extends State<AppEntryPoint> {
-  bool? _showWelcome;
+class _HomeWebViewPageState extends State<HomeWebViewPage> {
+  late final WebViewController _controller;
+  late final StreamSubscription<List<ConnectivityResult>> _connectivitySub;
+
+  bool _isLoading = true;
+  int _progress = 0;
+  String? _lastError;
+  bool _hasLoadedAtLeastOnce = false;
+  bool _isPageTransitioning = false;
+  bool _isOffline = false;
   bool _googleInitialized = false;
 
   @override
   void initState() {
     super.initState();
-    _checkFirstLaunch();
-    _initGoogleSignIn();
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: kAppBackgroundColor,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+    );
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: _onNavigationRequest,
+          onPageStarted: (_) {
+            if (!mounted) return;
+            setState(() {
+              _isLoading = true;
+              _lastError = null;
+              _isPageTransitioning = true;
+            });
+          },
+          onPageFinished: (_) {
+            if (!mounted) return;
+            _injectAppBridge();
+            _controller.currentUrl().then((currentUrl) {
+              debugPrint('[HomeWebView] page finished: $currentUrl');
+            });
+            Future.delayed(const Duration(milliseconds: 150), () {
+              if (!mounted) return;
+              setState(() {
+                _isLoading = false;
+                _lastError = null;
+                _hasLoadedAtLeastOnce = true;
+                _isPageTransitioning = false;
+                _isOffline = false;
+              });
+            });
+          },
+          onProgress: (value) {
+            if (!mounted) return;
+            setState(() => _progress = value);
+          },
+          onWebResourceError: (error) {
+            if (error.isForMainFrame != true) return;
+            if (!mounted) return;
+            setState(() {
+              _lastError = error.description;
+              _isLoading = false;
+              _isPageTransitioning = false;
+              _isOffline = true;
+            });
+          },
+        ),
+      );
+
+    _setupJsBridge();
+    _startConnectivityWatch();
+    unawaited(_initGoogleSignIn());
+    _loadInitialPage();
   }
 
   Future<void> _initGoogleSignIn() async {
+    if (_googleInitialized) return;
     try {
       await GoogleSignIn.instance.initialize(
         serverClientId:
             '849707147159-94nfr5dv3ic23d3t80qfdvfhoq9gd4mv.apps.googleusercontent.com',
       );
       _googleInitialized = true;
+    } catch (error) {
+      debugPrint('[GoogleSignIn] Init failed: $error');
+    }
+  }
+
+  void _startConnectivityWatch() {
+    _connectivitySub = Connectivity().onConnectivityChanged.listen((results) {
+      final offline = results.every((r) => r == ConnectivityResult.none);
+      if (!mounted) return;
+      final shouldRecover = !offline && (_isOffline || _lastError != null);
+      setState(() => _isOffline = offline);
+      if (shouldRecover) {
+        _loadLivePage();
+      }
+    });
+  }
+
+  Future<bool> _checkConnectivity() async {
+    final results = await Connectivity().checkConnectivity();
+    return results.any((r) => r != ConnectivityResult.none);
+  }
+
+  Future<void> _loadInitialPage() async {
+    try {
+      final online = await _checkConnectivity();
+      if (online) {
+        await _loadLivePage();
+      } else {
+        _showOfflineState();
+      }
+    } catch (error) {
+      _showOfflineState(error.toString());
+    }
+  }
+
+  Future<void> _loadLivePage([String? path]) async {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = true;
+      _isPageTransitioning = true;
+      _lastError = null;
+      _isOffline = false;
+    });
+    final requestedPath = path ?? widget.initialPath ?? '';
+    final url = requestedPath.isNotEmpty ? '$kLiveUrl$requestedPath' : kLiveUrl;
+    await _controller.loadRequest(Uri.parse(url));
+  }
+
+  void _showOfflineState([String? message]) {
+    if (!mounted) return;
+    setState(() {
+      _isOffline = true;
+      _isLoading = false;
+      _isPageTransitioning = false;
+      _lastError = message;
+    });
+  }
+
+  Future<void> _reload() async {
+    setState(() {
+      _isLoading = true;
+      _lastError = null;
+    });
+    try {
+      final online = await _checkConnectivity();
+      if (!online) {
+        _showOfflineState();
+        return;
+      }
+      if (_hasLoadedAtLeastOnce && !_isOffline) {
+        await _controller.reload();
+        return;
+      }
+      await _loadLivePage();
     } catch (e) {
-      debugPrint('[GoogleSignIn] Init failed: $e');
+      _showOfflineState(e.toString());
     }
   }
 
-  Future<void> _checkFirstLaunch() async {
+  bool _isMapLikeUrl(Uri uri, String rawUrl) {
+    final scheme = uri.scheme.toLowerCase();
+    final host = uri.host.toLowerCase();
+    final path = uri.path.toLowerCase();
+    final raw = rawUrl.toLowerCase();
+
+    if (scheme == 'intent' || scheme == 'geo' || scheme == 'comgooglemaps') {
+      return true;
+    }
+    if (host.contains('maps.google.') || host == 'maps.app.goo.gl') {
+      return true;
+    }
+    if (host.contains('google.com') && path.startsWith('/maps')) {
+      return true;
+    }
+    return raw.contains('google.com/maps') || raw.contains('maps.app.goo.gl');
+  }
+
+  Uri _resolveExternalUri(String rawUrl) {
+    final raw = rawUrl.trim();
+    if (raw.toLowerCase().startsWith('intent://')) {
+      final intentPrefix = 'intent://';
+      final intentIndex = raw.indexOf('#Intent;');
+      final body = intentIndex >= 0 ? raw.substring(0, intentIndex) : raw;
+      final meta = intentIndex >= 0 ? raw.substring(intentIndex) : '';
+      final defaultHostPath = body.substring(intentPrefix.length);
+      var scheme = 'https';
+      final schemeMatch = RegExp(r';scheme=([^;]+);').firstMatch(meta);
+      if (schemeMatch != null) {
+        scheme = (schemeMatch.group(1) ?? 'https').trim();
+      }
+      return Uri.parse('$scheme://$defaultHostPath');
+    }
+    return Uri.parse(raw);
+  }
+
+  bool _isDeepLink(Uri uri) {
+    final host = uri.host.toLowerCase();
+    return host == kDeepLinkHost || host == kDeepLinkHostWww;
+  }
+
+  Future<NavigationDecision> _onNavigationRequest(
+    NavigationRequest request,
+  ) async {
+    final rawUrl = request.url.trim();
+    final parsed = Uri.tryParse(rawUrl);
+    if (parsed == null) return NavigationDecision.navigate;
+
+    if (_isDeepLink(parsed)) {
+      return NavigationDecision.navigate;
+    }
+
+    final scheme = parsed.scheme.toLowerCase();
+    final shouldOpenExternally =
+        _isMapLikeUrl(parsed, rawUrl) ||
+        (scheme != 'http' &&
+            scheme != 'https' &&
+            scheme != 'about' &&
+            scheme != 'file' &&
+            scheme != 'data' &&
+            scheme != 'javascript');
+
+    if (!shouldOpenExternally) return NavigationDecision.navigate;
+
+    Uri externalUri;
+    try {
+      externalUri = _resolveExternalUri(rawUrl);
+    } catch (error) {
+      return NavigationDecision.prevent;
+    }
+    await launchUrl(externalUri, mode: LaunchMode.externalApplication);
+    return NavigationDecision.prevent;
+  }
+
+  void _setupJsBridge() {
+    for (final channel in ['AramaBulIOS', 'AramaBulAndroid']) {
+      _controller.addJavaScriptChannel(
+        channel,
+        onMessageReceived: (message) => _handleJsMessage(message.message),
+      );
+    }
+  }
+
+  void _handleJsMessage(String raw) {
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final action = data['action'] as String? ?? '';
+
+      switch (action) {
+        case 'console_log':
+          final type = data['type'] as String? ?? 'log';
+          final message = data['message'] as String? ?? '';
+          debugPrint('[WebViewConsole-$type] $message');
+          break;
+        case 'auth_snapshot':
+          final usersRaw = data['usersRaw'] as String? ?? '[]';
+          final sessionRaw = data['sessionRaw'] as String? ?? '';
+          SharedPreferences.getInstance().then((prefs) {
+            try {
+              final decodedUsers = jsonDecode(usersRaw);
+              if (decodedUsers is List) {
+                final normalizedUsers = jsonEncode(decodedUsers);
+                prefs.setString(_kNativeUsersKey, normalizedUsers);
+                prefs.setString('aramabul.auth.users.v1', normalizedUsers);
+              }
+            } catch (e) {
+              debugPrint('[AuthSync] users snapshot parse failed: $e');
+            }
+
+            try {
+              if (sessionRaw.trim().isNotEmpty) {
+                final decodedSession = jsonDecode(sessionRaw);
+                if (decodedSession is Map) {
+                  final name = decodedSession['name'] as String? ?? '';
+                  final email = decodedSession['email'] as String? ?? '';
+                  if (name.isNotEmpty && email.isNotEmpty) {
+                    prefs.setString('auth_user_name', name);
+                    prefs.setString('auth_user_email', email);
+                  }
+                }
+              }
+            } catch (e) {
+              debugPrint('[AuthSync] session snapshot parse failed: $e');
+            }
+          });
+          break;
+        case 'getAppInfo':
+          _controller.runJavaScript(
+            'window.__ARAMABUL_APP__ = ${jsonEncode({'platform': 'ios', 'version': kAppVersion, 'isApp': true})}',
+          );
+          break;
+        case 'shareVenue':
+          final title = data['title'] as String? ?? 'AramaBul';
+          final url = data['url'] as String? ?? kLiveUrl;
+          Share.share('$title $url');
+          break;
+        case 'google_signin':
+          _handleGoogleSignInFromWebView();
+          break;
+        case 'apple_signin':
+          _handleAppleSignInFromWebView();
+          break;
+        case 'login_success':
+          final loginName = data['name'] as String? ?? '';
+          final loginEmail = data['email'] as String? ?? '';
+          SharedPreferences.getInstance().then((prefs) async {
+            await prefs.setString('auth_user_name', loginName);
+            await prefs.setString('auth_user_email', loginEmail);
+          });
+          break;
+        case 'logout':
+        case 'accountDeleted':
+          _resetSession();
+          break;
+      }
+    } catch (e) {
+      debugPrint('JS bridge parse error: $e');
+    }
+  }
+
+  Future<void> _resetSession() async {
     final prefs = await SharedPreferences.getInstance();
-    final seen = prefs.getBool(_kWelcomeSeenKey) ?? false;
+    await prefs.remove('auth_user_name');
+    await prefs.remove('auth_user_email');
+    try {
+      await GoogleSignIn.instance.signOut();
+    } catch (_) {}
+    await WebViewCookieManager().clearCookies();
     if (!mounted) return;
-    setState(() => _showWelcome = !seen);
+    await _loadLivePage('/');
   }
 
-  Future<void> _onWelcomeComplete(String? route) async {
-    if (!mounted) return;
-
-    switch (route) {
-      case 'login':
-      case 'register':
-        // No WebView login — show snackbar directing to social login
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Lütfen Google veya Apple ile giriş yapın.'),
-            backgroundColor: Color(0xFF094174),
-          ),
-        );
-        break;
-
-      case 'google_signin':
-        await _handleGoogleSignIn();
-        break;
-
-      case 'apple_signin':
-        await _handleAppleSignIn();
-        break;
-
-      case 'facebook_signin':
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Facebook ile giriş yakında aktif olacak.'),
-            backgroundColor: Color(0xFF094174),
-          ),
-        );
-        break;
-
-      case 'privacy':
-        launchUrl(
-          Uri.parse('https://aramabul.com/gizlilik-politikasi.html'),
-          mode: LaunchMode.externalApplication,
-        );
-        break;
-
-      case 'terms':
-        launchUrl(
-          Uri.parse('https://aramabul.com/kullanim-kosullari.html'),
-          mode: LaunchMode.externalApplication,
-        );
-        break;
-
-      case 'lang_tr':
-      case 'lang_en':
-      case 'lang_de':
-      case 'lang_ru':
-        final langCode = route!.replaceFirst('lang_', '');
-        final prefsL = await SharedPreferences.getInstance();
-        await prefsL.setString('app_language', langCode);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(langCode == 'tr'
-                ? 'Dil: Türkçe'
-                : langCode == 'en'
-                    ? 'Language: English'
-                    : langCode == 'de'
-                        ? 'Sprache: Deutsch'
-                        : 'Язык: Русский'),
-            backgroundColor: const Color(0xFF094174),
-            duration: const Duration(seconds: 1),
-          ),
-        );
-        _globalAppLanguage = langCode.toUpperCase();
-        break;
-
-      default:
-        // Guest — just go to home
-        final prefsG = await SharedPreferences.getInstance();
-        await prefsG.setBool(_kWelcomeSeenKey, true);
-        if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const TabShell()),
-        );
-    }
-  }
-
-  /// Register social login user with backend
-  Future<void> _registerSocialLogin({
+  Future<Map<String, String>> _registerSocialLogin({
     required String provider,
     required String email,
     required String name,
-    String? providerId,
+    required String providerId,
+    required String idToken,
   }) async {
+    final client = HttpClient();
     try {
-      final client = HttpClient();
       final request = await client.postUrl(
-        Uri.parse('https://aramabul.com/api/auth/social-login'),
+        Uri.parse('$kLiveUrl/api/auth/social-login'),
       );
       request.headers.set('Content-Type', 'application/json');
-      request.write(jsonEncode({
-        'provider': provider,
-        'email': email,
-        'name': name,
-        'providerId': providerId ?? '',
-      }));
+      request.headers.set('Accept', 'application/json');
+      request.write(
+        jsonEncode({
+          'provider': provider,
+          'email': email,
+          'name': name,
+          'providerId': providerId,
+          'idToken': idToken,
+        }),
+      );
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
-      debugPrint('[SocialLogin] $provider -> ${response.statusCode}: $body');
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw HttpException('Social login failed: ${response.statusCode}');
+      }
+
+      final payload = jsonDecode(body) as Map<String, dynamic>;
+      final user = payload['user'] as Map<String, dynamic>? ?? const {};
+      return {
+        'name': (user['displayName'] as String? ?? name).trim(),
+        'email': (user['email'] as String? ?? email).trim(),
+      };
+    } finally {
       client.close();
-    } catch (e) {
-      debugPrint('[SocialLogin] Backend registration failed: $e');
     }
   }
 
-  Future<void> _handleGoogleSignIn() async {
+  Future<void> _syncSocialSessionToWeb({
+    required String name,
+    required String email,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_user_name', name);
+    await prefs.setString('auth_user_email', email);
+
+    final sessionLiteral = jsonEncode(
+      jsonEncode({'name': name, 'email': email}),
+    );
+    await _controller.runJavaScript('''
+      try { localStorage.setItem('aramabul.auth.session.v1', $sessionLiteral); } catch(e) {}
+      try { document.dispatchEvent(new CustomEvent('aramabul:authchange')); } catch(e) {}
+      var nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set('t', Date.now().toString());
+      window.location.href = nextUrl.toString();
+    ''');
+  }
+
+  Future<void> _handleGoogleSignInFromWebView() async {
+    await _setSocialButtonState(
+      provider: 'google',
+      loading: true,
+      message: 'Google hesabınıza yönlendiriliyorsunuz...',
+    );
+
     try {
-      if (!_googleInitialized) {
-        await _initGoogleSignIn();
-      }
+      await _initGoogleSignIn();
       final account = await GoogleSignIn.instance.authenticate();
-      // ignore: unnecessary_null_comparison
-      if (account == null) return;
+      final idToken = account.authentication.idToken ?? '';
+      if (idToken.isEmpty) {
+        throw const FormatException('Google kimlik belirteci alınamadı.');
+      }
 
       final name = account.displayName ?? '';
       final email = account.email;
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_kWelcomeSeenKey, true);
-      await prefs.setString('auth_user_name', name);
-      await prefs.setString('auth_user_email', email);
-
-      _registerSocialLogin(
+      final session = await _registerSocialLogin(
         provider: 'google',
         email: email,
         name: name,
         providerId: account.id,
+        idToken: idToken,
       );
-
-      if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const TabShell()),
-        (route) => false,
+      await _syncSocialSessionToWeb(
+        name: session['name'] ?? name,
+        email: session['email'] ?? email,
       );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Google ile giriş başarısız: $e'),
-          backgroundColor: Colors.red.shade700,
-        ),
+      debugPrint('[GoogleSignIn] Error: $e');
+      await _setSocialButtonState(
+        provider: 'google',
+        loading: false,
+        error: 'Google ile giriş başarısız.',
       );
     }
   }
 
-  Future<void> _handleAppleSignIn() async {
-    try {
-      final isAvailable = await SignInWithApple.isAvailable();
-      if (!isAvailable) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Apple ile giriş bu cihazda desteklenmiyor.'),
-            backgroundColor: Color(0xFF094174),
-          ),
-        );
-        return;
-      }
+  Future<void> _handleAppleSignInFromWebView() async {
+    await _setSocialButtonState(
+      provider: 'apple',
+      loading: true,
+      message: 'Apple hesabınıza yönlendiriliyorsunuz...',
+    );
 
+    try {
       final credential = await SignInWithApple.getAppleIDCredential(
-        scopes: [
+        scopes: const [
           AppleIDAuthorizationScopes.email,
           AppleIDAuthorizationScopes.fullName,
         ],
-        webAuthenticationOptions: WebAuthenticationOptions(
-          clientId: 'com.aramabul.app.signin',
-          redirectUri:
-              Uri.parse('https://aramabul.com/api/auth/apple-callback'),
-        ),
       );
-
-      final name = [
-        credential.givenName ?? '',
-        credential.familyName ?? '',
-      ].where((s) => s.isNotEmpty).join(' ');
-      final email = credential.email ?? '';
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_kWelcomeSeenKey, true);
-      if (name.isNotEmpty) await prefs.setString('auth_user_name', name);
-      if (email.isNotEmpty) await prefs.setString('auth_user_email', email);
-      if (credential.userIdentifier != null) {
-        await prefs.setString('auth_apple_id', credential.userIdentifier!);
+      final providerId = credential.userIdentifier?.trim() ?? '';
+      final idToken = credential.identityToken?.trim() ?? '';
+      if (providerId.isEmpty) {
+        throw const FormatException('Apple kullanıcı kimliği alınamadı.');
+      }
+      if (idToken.isEmpty) {
+        throw const FormatException('Apple kimlik belirteci alınamadı.');
       }
 
-      _registerSocialLogin(
+      final prefs = await SharedPreferences.getInstance();
+      final accountKey = 'apple_account_$providerId';
+      final stored = prefs.getString(accountKey);
+      final storedAccount = stored == null
+          ? <String, dynamic>{}
+          : jsonDecode(stored) as Map<String, dynamic>;
+      final receivedName = [
+        credential.givenName?.trim() ?? '',
+        credential.familyName?.trim() ?? '',
+      ].where((part) => part.isNotEmpty).join(' ');
+      final name = receivedName.isNotEmpty
+          ? receivedName
+          : (storedAccount['name'] as String? ?? 'Apple kullanıcısı');
+      final email =
+          credential.email?.trim() ?? (storedAccount['email'] as String? ?? '');
+
+      final session = await _registerSocialLogin(
         provider: 'apple',
         email: email,
         name: name,
-        providerId: credential.userIdentifier,
+        providerId: providerId,
+        idToken: idToken,
       );
-
-      if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const TabShell()),
-        (route) => false,
+      final sessionName = session['name'] ?? name;
+      final sessionEmail = session['email'] ?? email;
+      await prefs.setString(
+        accountKey,
+        jsonEncode({'name': sessionName, 'email': sessionEmail}),
       );
-    } catch (e) {
-      if (!mounted) return;
-      if (e is SignInWithAppleAuthorizationException &&
-          e.code == AuthorizationErrorCode.canceled) {
+      await _syncSocialSessionToWeb(name: sessionName, email: sessionEmail);
+    } on SignInWithAppleAuthorizationException catch (error) {
+      if (error.code == AuthorizationErrorCode.canceled) {
+        await _setSocialButtonState(provider: 'apple', loading: false);
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Apple ile giriş başarısız: $e'),
-          backgroundColor: Colors.red.shade700,
-        ),
+      await _setSocialButtonState(
+        provider: 'apple',
+        loading: false,
+        error: 'Apple ile giriş başarısız.',
+      );
+    } catch (error) {
+      debugPrint('[AppleSignIn] Error: $error');
+      await _setSocialButtonState(
+        provider: 'apple',
+        loading: false,
+        error: 'Apple ile giriş başarısız.',
       );
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    if (_showWelcome == null) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF094174),
-        body: Center(
-          child: CircularProgressIndicator(color: Colors.white),
-        ),
-      );
-    }
-
-    if (_showWelcome!) {
-      return WelcomeScreen(onContinue: _onWelcomeComplete);
-    }
-
-    return const TabShell();
-  }
-}
-
-// ==========================================================================
-// TabShell — 100% Native bottom navigation with IndexedStack
-// ==========================================================================
-
-class TabShell extends StatefulWidget {
-  const TabShell({super.key});
-
-  @override
-  State<TabShell> createState() => _TabShellState();
-}
-
-class _TabShellState extends State<TabShell> {
-  int _currentIndex = 0;
-
-  final GlobalKey<NavigatorState> _exploreNavigatorKey = GlobalKey<NavigatorState>();
-  final GlobalKey<NavigatorState> _searchNavigatorKey = GlobalKey<NavigatorState>();
-  final GlobalKey<NavigatorState> _favoritesNavigatorKey = GlobalKey<NavigatorState>();
-
-  // AdMob banner
-  BannerAd? _bannerAd;
-  bool _isBannerLoaded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _requestATTAndLoadAd();
+  Future<void> _setSocialButtonState({
+    required String provider,
+    required bool loading,
+    String? message,
+    String? error,
+  }) {
+    final providerLiteral = jsonEncode(provider);
+    final messageLiteral = jsonEncode(error ?? message ?? '');
+    final color = error == null ? '#4a90d9' : '#e74c3c';
+    return _controller.runJavaScript('''
+      document.querySelectorAll('[data-native-social-provider="' + $providerLiteral + '"]').forEach(function(btn) {
+        btn.disabled = ${loading ? 'true' : 'false'};
+        btn.style.opacity = ${loading ? "'0.6'" : "'1'"};
+      });
+      var msg = document.getElementById('appLoginMsg') ||
+        document.getElementById('settingsLoginMessage') ||
+        document.getElementById('accountLoginMessage');
+      if (msg) {
+        msg.style.color = '$color';
+        msg.textContent = $messageLiteral;
+      }
+    ''');
   }
 
-  /// Request App Tracking Transparency permission, then load banner ad.
-  Future<void> _requestATTAndLoadAd() async {
-    // Wait for first frame so the ATT dialog shows properly
-    await Future.delayed(const Duration(seconds: 1));
+  Future<void> _injectAppBridge() async {
     try {
-      final status = await AppTrackingTransparency.requestTrackingAuthorization();
-      debugPrint('[ATT] Tracking status: $status');
-    } catch (e) {
-      debugPrint('[ATT] Error: $e');
-    }
-    _loadBannerAd();
-  }
+      final prefs = await SharedPreferences.getInstance();
+      final authName = prefs.getString('auth_user_name') ?? '';
+      final authEmail = prefs.getString('auth_user_email') ?? '';
+      final authSessionJson = (authName.isNotEmpty && authEmail.isNotEmpty)
+          ? jsonEncode({'name': authName, 'email': authEmail})
+          : '';
+      final nativeUsersRaw = prefs.getString('aramabul.auth.users.v1') ?? '[]';
+      final appInfoLiteral = jsonEncode({
+        'platform': 'ios',
+        'version': kAppVersion,
+        'isApp': true,
+      });
+      final usersLiteral = jsonEncode(nativeUsersRaw);
+      final sessionLiteral = jsonEncode(authSessionJson);
 
-  int _bannerRetryCount = 0;
-  static const int _maxBannerRetries = 3;
-
-  void _loadBannerAd() {
-    _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-3016888060216617/4581966772',
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) {
-          debugPrint('[AdMob] Banner loaded successfully');
-          _bannerRetryCount = 0;
-          if (mounted) setState(() => _isBannerLoaded = true);
-        },
-        onAdFailedToLoad: (ad, error) {
-          debugPrint('[AdMob] Banner failed: $error (attempt ${_bannerRetryCount + 1})');
-          ad.dispose();
-          _bannerAd = null;
-          // Retry with exponential backoff
-          if (_bannerRetryCount < _maxBannerRetries) {
-            _bannerRetryCount++;
-            final delay = Duration(seconds: _bannerRetryCount * 10);
-            debugPrint('[AdMob] Retrying in ${delay.inSeconds}s...');
-            Future.delayed(delay, () {
-              if (mounted) _loadBannerAd();
-            });
+      await _controller.runJavaScript('''
+        try {
+          window.__ARAMABUL_APP__ = $appInfoLiteral;
+          try {
+            localStorage.setItem('aramabul.auth.users.v1', $usersLiteral);
+          } catch(e) {}
+          if ($sessionLiteral) {
+            try { localStorage.setItem('aramabul.auth.session.v1', $sessionLiteral); } catch(e) {}
+          } else {
+            try { localStorage.removeItem('aramabul.auth.session.v1'); } catch(e) {}
           }
-        },
-      ),
-    )..load();
-  }
+          window.ARAMABUL_GOOGLE_SIGN_IN = function() {
+            var bridge = window.AramaBulIOS || window.AramaBulAndroid;
+            if (bridge) {
+              bridge.postMessage(JSON.stringify({ action: 'google_signin' }));
+            }
+          };
+          window.ARAMABUL_APPLE_SIGN_IN = function() {
+            var bridge = window.AramaBulIOS || window.AramaBulAndroid;
+            if (bridge) {
+              bridge.postMessage(JSON.stringify({ action: 'apple_signin' }));
+            }
+          };
+          try {
+            document.dispatchEvent(new CustomEvent('aramabul:appready'));
+          } catch(e) {}
+          try {
+            var snapshotUsers = localStorage.getItem('aramabul.auth.users.v1') || '[]';
+            var snapshotSession = localStorage.getItem('aramabul.auth.session.v1') || '';
+            var bridge = window.AramaBulIOS || window.AramaBulAndroid;
+            if (bridge) {
+              bridge.postMessage(JSON.stringify({
+                action: 'auth_snapshot',
+                usersRaw: snapshotUsers,
+                sessionRaw: snapshotSession
+              }));
+            }
+          } catch(e) {}
 
-  @override
-  void dispose() {
-    _bannerAd?.dispose();
-    super.dispose();
-  }
-
-  void _goToWelcome() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const AppEntryPoint()),
-      (route) => false,
-    );
+          try {
+            document.dispatchEvent(new CustomEvent('aramabul:authchange'));
+          } catch(e) {}
+        } catch (e) {}
+      ''');
+    } catch (error) {
+      debugPrint('[HomeWebView] App bridge injection failed: $error');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF094174),
-      body: SafeArea(
-        bottom: false,
-        child: IndexedStack(
-          index: _currentIndex,
+    final showProgress = _isLoading && _progress < 100;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (await _controller.canGoBack()) {
+          await _controller.goBack();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: kAppBackgroundColor,
+        body: Column(
           children: [
-            Navigator(
-              key: _exploreNavigatorKey,
-              onGenerateRoute: (settings) => MaterialPageRoute(
-                builder: (_) => const ExploreScreen(),
-              ),
+            Container(
+              color: kAppBackgroundColor,
+              height: MediaQuery.of(context).padding.top,
             ),
-            Navigator(
-              key: _searchNavigatorKey,
-              onGenerateRoute: (settings) => MaterialPageRoute(
-                builder: (_) => const SearchScreen(),
+            if (showProgress)
+              LinearProgressIndicator(
+                value: _progress / 100,
+                color: kAppProgressColor,
+                backgroundColor: const Color(0xFFF1F3F5),
               ),
-            ),
-            Navigator(
-              key: _favoritesNavigatorKey,
-              onGenerateRoute: (settings) => MaterialPageRoute(
-                builder: (_) => const FavoritesScreen(),
-              ),
-            ),
-            SettingsScreen(onSignOut: _goToWelcome),
-          ],
-        ),
-      ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Bottom nav bar
-          Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF094174),
-              border: Border(
-                top: BorderSide(color: Color(0xFF1a5a8a), width: 0.5),
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+            Expanded(
+              child: Stack(
                 children: [
-                    _NavItem(
-                      assetPath: 'assets/welcome/ev.png',
-                      label: 'Ana Sayfa',
-                      isActive: _currentIndex == 0,
-                      onTap: () {
-                        if (_currentIndex == 0) {
-                          _exploreNavigatorKey.currentState?.popUntil((route) => route.isFirst);
-                        } else {
-                          setState(() => _currentIndex = 0);
-                        }
-                      },
+                  if (_hasLoadedAtLeastOnce && !_isOffline)
+                    WebViewWidget(controller: _controller),
+                  if (_isOffline)
+                    OfflineView(
+                      details: kDebugMode ? _lastError : null,
+                      onRetry: _reload,
                     ),
-                    _NavItem(
-                      icon: Icons.search_rounded,
-                      label: 'Ara',
-                      isActive: _currentIndex == 1,
-                      onTap: () {
-                        if (_currentIndex == 1) {
-                          _searchNavigatorKey.currentState?.popUntil((route) => route.isFirst);
-                        } else {
-                          setState(() => _currentIndex = 1);
-                        }
-                      },
-                    ),
-                    _NavItem(
-                      assetPath: 'assets/welcome/fav.png',
-                      label: 'Favoriler',
-                      isActive: _currentIndex == 2,
-                      onTap: () {
-                        if (_currentIndex == 2) {
-                          _favoritesNavigatorKey.currentState?.popUntil((route) => route.isFirst);
-                        } else {
-                          setState(() => _currentIndex = 2);
-                        }
-                      },
-                    ),
-                    _NavItem(
-                      assetPath: 'assets/welcome/ayar.png',
-                      label: 'Ayarlar',
-                      isActive: _currentIndex == 3,
-                      onTap: () => setState(() => _currentIndex = 3),
+                  if (!_isOffline &&
+                      (_isPageTransitioning || !_hasLoadedAtLeastOnce))
+                    Positioned.fill(
+                      child: Container(
+                        color: kAppBackgroundColor,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            color: kAppProgressColor,
+                          ),
+                        ),
+                      ),
                     ),
                 ],
               ),
             ),
-          ),
-          // AdMob banner
-          if (_isBannerLoaded && _bannerAd != null)
-            SafeArea(
-              top: false,
-              child: Container(
-                color: const Color(0xFF094174),
-                width: double.infinity,
-                height: _bannerAd!.size.height.toDouble(),
-                child: AdWidget(ad: _bannerAd!),
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
+
+  @override
+  void dispose() {
+    _connectivitySub.cancel();
+    super.dispose();
+  }
 }
 
-// ==========================================================================
-// Navigation bar item
-// ==========================================================================
+class OfflineView extends StatelessWidget {
+  final String? details;
+  final VoidCallback onRetry;
 
-class _NavItem extends StatelessWidget {
-  final IconData? icon;
-  final String? assetPath;
-  final String label;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  const _NavItem({
-    this.icon,
-    this.assetPath,
-    required this.label,
-    required this.isActive,
-    required this.onTap,
-  });
+  const OfflineView({super.key, required this.details, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
-    final color = isActive
-        ? const Color(0xFF7bbce8)
-        : Colors.white.withValues(alpha: 0.7);
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        onTap();
-      },
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (assetPath != null)
-              Image.asset(
-                assetPath!,
-                width: 20,
-                height: 20,
-                color: color,
-                fit: BoxFit.contain,
-              )
-            else
-              Icon(icon, size: 20, color: color),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 14,
-                color: color,
-              ),
+    return ColoredBox(
+      color: Colors.white,
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.wifi_off_rounded,
+                  size: 42,
+                  color: Color(0xFF011E3A),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'İnternet bağlantısı yok',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF011E3A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Bağlantını kontrol edip yeniden deneyebilirsin.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.45,
+                    color: Color(0xFF52606D),
+                  ),
+                ),
+                if (details != null && details!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    details!,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF7B8794),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 22),
+                FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Tekrar dene'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(152, 44),
+                    backgroundColor: const Color(0xFF011E3A),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

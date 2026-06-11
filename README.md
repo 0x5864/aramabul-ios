@@ -1,17 +1,40 @@
-# aramabul
+# AramaBul iOS
 
-AramaBul - İstanbul Mekan Keşfi
+AramaBul is an Istanbul-first venue discovery app.
 
-## Getting Started
+## Architecture
 
-This project is a starting point for a Flutter application.
+The app uses the deployed web product at `https://aramabul.com` as its only
+interface source. Flutter provides the native iOS shell:
 
-A few resources to get you started if this is your first Flutter project:
+- Google sign-in bridge
+- native sharing
+- external map handling
+- connectivity monitoring
+- a native offline state
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+The repository does not keep a copied web snapshot. Web design and venue
+behavior must be changed in the main AramaBul web repository and deployed
+before they appear in the app.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Run
+
+"""
+flutter pub get
+flutter run
+"""
+
+## Verify
+
+"""
+dart format --output=none --set-exit-if-changed lib test
+flutter analyze
+flutter test
+flutter build ios --simulator --debug
+"""
+
+## Release
+
+Update the version in `pubspec.yaml`, verify the deployed website, then build
+the iOS archive. The `kAppVersion` value in `lib/main.dart` must match the
+pubspec version name.
