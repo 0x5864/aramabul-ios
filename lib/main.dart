@@ -379,7 +379,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
         case 'shareVenue':
           final title = data['title'] as String? ?? 'AramaBul';
           final url = data['url'] as String? ?? kLiveUrl;
-          Share.share('$title $url');
+          SharePlus.instance.share(ShareParams(text: '$title $url'));
           break;
         case 'google_signin':
           _handleGoogleSignInFromWebView();
