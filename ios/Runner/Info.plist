@@ -43,6 +43,8 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>AramaBul, size yakın mekanları gösterebilmek için konumunuzu kullanır.</string>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>Size daha ilgi çekici ve kişiselleştirilmiş mekan önerileri sunabilmek için bu izne ihtiyaç duyuyoruz.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

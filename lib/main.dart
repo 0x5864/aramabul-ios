@@ -13,6 +13,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -139,7 +140,22 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
     _setupJsBridge();
     _startConnectivityWatch();
     unawaited(_initGoogleSignIn());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_requestTrackingPermission());
+    });
     _loadInitialPage();
+  }
+
+  Future<void> _requestTrackingPermission() async {
+    try {
+      await Future.delayed(const Duration(milliseconds: 1200));
+      final status = await AppTrackingTransparency.trackingAuthorizationStatus;
+      if (status == TrackingStatus.notDetermined) {
+        await AppTrackingTransparency.requestTrackingAuthorization();
+      }
+    } catch (e) {
+      debugPrint('[ATT] Request tracking authorization failed: $e');
+    }
   }
 
   Future<void> _initGoogleSignIn() async {
