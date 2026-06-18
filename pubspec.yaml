@@ -2,7 +2,7 @@ name: aramabul_ios
 description: "AramaBul Turkey venue discovery app for iOS."
 publish_to: 'none'
 
-version: 1.2.2+46
+version: 1.2.2+47
 
 environment:
   sdk: ^3.11.5
