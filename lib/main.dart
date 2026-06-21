@@ -23,7 +23,7 @@ const String kDeepLinkHost = 'aramabul.com';
 const String kDeepLinkHostWww = 'www.aramabul.com';
 
 const String kAppVersion = '1.2.2';
-const String kAppBuildNumber = '50';
+const String kAppBuildNumber = '51';
 const String kAppWebCacheVersion = '20260621-mobile-location-failsafe-v2';
 
 const Color kAppBackgroundColor = Colors.white;
@@ -82,6 +82,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
   bool _googleInitialized = false;
   Timer? _loadingWatchdog;
   int _lastLoggedProgressBucket = -1;
+  DateTime? _suppressExternalMapsUntil;
 
   @override
   void initState() {
@@ -360,6 +361,13 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
       return NavigationDecision.navigate;
     }
 
+    if (_isMapLikeUrl(parsed, rawUrl) &&
+        _suppressExternalMapsUntil != null &&
+        DateTime.now().isBefore(_suppressExternalMapsUntil!)) {
+      debugPrint('[HomeWebView] navigation decision: suppress external map $rawUrl');
+      return NavigationDecision.prevent;
+    }
+
     Uri externalUri;
     try {
       externalUri = _resolveExternalUri(rawUrl);
@@ -433,6 +441,16 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
           final title = data['title'] as String? ?? 'AramaBul';
           final url = data['url'] as String? ?? kLiveUrl;
           SharePlus.instance.share(ShareParams(text: '$title $url'));
+          break;
+        case 'suppressExternalMaps':
+          final milliseconds = (data['milliseconds'] as num?)?.toInt() ?? 1500;
+          final safeMilliseconds = milliseconds.clamp(300, 5000);
+          _suppressExternalMapsUntil = DateTime.now().add(
+            Duration(milliseconds: safeMilliseconds),
+          );
+          debugPrint(
+            '[HomeWebView] suppress external maps for ${safeMilliseconds}ms',
+          );
           break;
         case 'google_signin':
           _handleGoogleSignInFromWebView();
