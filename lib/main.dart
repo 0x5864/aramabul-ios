@@ -18,11 +18,13 @@ import 'package:share_plus/share_plus.dart';
 // Configuration
 // ---------------------------------------------------------------------------
 
-const String kLiveUrl = 'https://aramabul.com';
+final String kLiveUrl = kDebugMode ? 'http://127.0.0.1:8787' : 'https://aramabul.com';
 const String kDeepLinkHost = 'aramabul.com';
 const String kDeepLinkHostWww = 'www.aramabul.com';
 
 const String kAppVersion = '1.2.2';
+const String kAppBuildNumber = '50';
+const String kAppWebCacheVersion = '20260621-mobile-location-failsafe-v2';
 
 const Color kAppBackgroundColor = Colors.white;
 const Color kAppProgressColor = Color(0xFFE30A17);
@@ -78,6 +80,8 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
   bool _isPageTransitioning = false;
   bool _isOffline = false;
   bool _googleInitialized = false;
+  Timer? _loadingWatchdog;
+  int _lastLoggedProgressBucket = -1;
 
   @override
   void initState() {
@@ -95,16 +99,19 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: _onNavigationRequest,
-          onPageStarted: (_) {
+          onPageStarted: (url) {
+            debugPrint('[HomeWebView] page started: $url');
             if (!mounted) return;
             setState(() {
               _isLoading = true;
               _lastError = null;
               _isPageTransitioning = true;
             });
+            _startLoadingWatchdog('page started');
           },
           onPageFinished: (_) {
             if (!mounted) return;
+            _loadingWatchdog?.cancel();
             _injectAppBridge();
             _controller.currentUrl().then((currentUrl) {
               debugPrint('[HomeWebView] page finished: $currentUrl');
@@ -122,11 +129,21 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
           },
           onProgress: (value) {
             if (!mounted) return;
+            final bucket = value ~/ 25;
+            if (bucket != _lastLoggedProgressBucket || value == 100) {
+              _lastLoggedProgressBucket = bucket;
+              debugPrint('[HomeWebView] progress: $value');
+            }
             setState(() => _progress = value);
           },
           onWebResourceError: (error) {
             if (error.isForMainFrame != true) return;
+            debugPrint(
+              '[HomeWebView] main frame error: '
+              '${error.errorCode} ${error.errorType} ${error.description}',
+            );
             if (!mounted) return;
+            _loadingWatchdog?.cancel();
             setState(() {
               _lastError = error.description;
               _isLoading = false;
@@ -140,9 +157,21 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
     _setupJsBridge();
     _startConnectivityWatch();
     unawaited(_initGoogleSignIn());
-    _loadInitialPage();
+    unawaited(_bootstrapInitialPage());
   }
 
+  Future<void> _bootstrapInitialPage() async {
+    await _prepareWebViewForFreshLiveAssets();
+    await _loadInitialPage();
+  }
+
+  Future<void> _prepareWebViewForFreshLiveAssets() async {
+    try {
+      await _controller.clearCache();
+    } catch (error) {
+      debugPrint('[HomeWebView] cache clear skipped: $error');
+    }
+  }
 
   Future<void> _initGoogleSignIn() async {
     if (_googleInitialized) return;
@@ -189,6 +218,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
 
   Future<void> _loadLivePage([String? path]) async {
     if (!mounted) return;
+    debugPrint('[HomeWebView] load live page path: ${path ?? widget.initialPath ?? '/'}');
     setState(() {
       _isLoading = true;
       _isPageTransitioning = true;
@@ -196,8 +226,34 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
       _isOffline = false;
     });
     final requestedPath = path ?? widget.initialPath ?? '';
-    final url = requestedPath.isNotEmpty ? '$kLiveUrl$requestedPath' : kLiveUrl;
-    await _controller.loadRequest(Uri.parse(url));
+    final rawUrl = requestedPath.isNotEmpty ? '$kLiveUrl$requestedPath' : kLiveUrl;
+    final uri = Uri.parse(rawUrl);
+    final url = uri.replace(
+      queryParameters: {
+        ...uri.queryParameters,
+        'appCache': kAppWebCacheVersion,
+      },
+    );
+    _startLoadingWatchdog('load live page');
+    await _controller.loadRequest(url);
+  }
+
+  void _startLoadingWatchdog(String reason) {
+    _loadingWatchdog?.cancel();
+    _loadingWatchdog = Timer(const Duration(seconds: 8), () async {
+      if (!mounted || (!_isLoading && !_isPageTransitioning)) return;
+      final currentUrl = await _controller.currentUrl();
+      debugPrint(
+        '[HomeWebView] loading watchdog released overlay '
+        'reason=$reason progress=$_progress url=$currentUrl',
+      );
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _isPageTransitioning = false;
+        _hasLoadedAtLeastOnce = true;
+      });
+    });
   }
 
   void _showOfflineState([String? message]) {
@@ -276,10 +332,12 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
     NavigationRequest request,
   ) async {
     final rawUrl = request.url.trim();
+    debugPrint('[HomeWebView] navigation request: $rawUrl');
     final parsed = Uri.tryParse(rawUrl);
     if (parsed == null) return NavigationDecision.navigate;
 
     if (_isDeepLink(parsed)) {
+      debugPrint('[HomeWebView] navigation decision: navigate internal');
       return NavigationDecision.navigate;
     }
 
@@ -293,14 +351,19 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
             scheme != 'data' &&
             scheme != 'javascript');
 
-    if (!shouldOpenExternally) return NavigationDecision.navigate;
+    if (!shouldOpenExternally) {
+      debugPrint('[HomeWebView] navigation decision: navigate');
+      return NavigationDecision.navigate;
+    }
 
     Uri externalUri;
     try {
       externalUri = _resolveExternalUri(rawUrl);
     } catch (error) {
+      debugPrint('[HomeWebView] external navigation parse failed: $error');
       return NavigationDecision.prevent;
     }
+    debugPrint('[HomeWebView] navigation decision: open external $externalUri');
     await launchUrl(externalUri, mode: LaunchMode.externalApplication);
     return NavigationDecision.prevent;
   }
@@ -359,7 +422,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
           break;
         case 'getAppInfo':
           _controller.runJavaScript(
-            'window.__ARAMABUL_APP__ = ${jsonEncode({'platform': 'ios', 'version': kAppVersion, 'isApp': true})}',
+            'window.__ARAMABUL_APP__ = ${jsonEncode({'platform': 'ios', 'version': kAppVersion, 'build': kAppBuildNumber, 'isApp': true})}',
           );
           break;
         case 'shareVenue':
@@ -611,6 +674,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
       final appInfoLiteral = jsonEncode({
         'platform': 'ios',
         'version': kAppVersion,
+        'build': kAppBuildNumber,
         'isApp': true,
       });
       final usersLiteral = jsonEncode(nativeUsersRaw);
@@ -639,6 +703,175 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
               bridge.postMessage(JSON.stringify({ action: 'apple_signin' }));
             }
           };
+          try {
+            (function renderNativeAppVersion() {
+              function render() {
+                var app = window.__ARAMABUL_APP__ || {};
+                if (!app.isApp) return;
+                var version = String(app.version || '').trim();
+                var build = String(app.build || '').trim();
+                if (!version && !build) return;
+                var row = document.querySelector('[data-app-version-row]');
+                var text = document.querySelector('[data-app-version-text]');
+                var sidebar = document.querySelector('.settings-sidebar-card');
+                if (!row && sidebar) {
+                  row = document.createElement('div');
+                  row.className = 'settings-app-version';
+                  row.setAttribute('data-app-version-row', '');
+                  row.innerHTML = '<span class="settings-app-version-label">Uygulama sürümü</span><span class="settings-app-version-value" data-app-version-text></span>';
+                  sidebar.appendChild(row);
+                  text = row.querySelector('[data-app-version-text]');
+                }
+                if (!row || !text) return;
+                text.textContent = build ? 'AB ' + (version || 'app') + '+' + build : 'AB ' + version;
+                row.hidden = false;
+                row.style.display = 'grid';
+              }
+              render();
+              window.setTimeout(render, 250);
+              window.setTimeout(render, 1000);
+              document.addEventListener('DOMContentLoaded', render);
+              document.addEventListener('aramabul:appready', render);
+              document.addEventListener('aramabul:authchange', render);
+            })();
+          } catch(e) {}
+          try {
+            (function installAppLocationNavigationBypass() {
+              if (window.__ARAMABUL_APP_LOCATION_NAV_BYPASS__) {
+                return;
+              }
+              window.__ARAMABUL_APP_LOCATION_NAV_BYPASS__ = true;
+
+              function stripNearbyUrl(rawHref) {
+                var href = String(rawHref || '').trim();
+                if (!href) {
+                  return '';
+                }
+                try {
+                  var url = new URL(href, window.location.href);
+                  url.searchParams.delete('nearby');
+                  url.searchParams.delete('neighborhood');
+                  return url.pathname + url.search + url.hash;
+                } catch (error) {
+                  return href
+                    .replace(/[?&]nearby=1\b/g, '')
+                    .replace(/[?&]neighborhood=[^&]*/g, '');
+                }
+              }
+
+              function isDiscoveryHref(href) {
+                try {
+                  var path = new URL(String(href || ''), window.location.href).pathname;
+                  return /(yeme-icme|gezi|hizmetler|saglik|kultur|sanat)[.]html/.test(path);
+                } catch (error) {
+                  return String(href || '').indexOf('.html') !== -1;
+                }
+              }
+
+              function handleClick(event) {
+                var target = event.target && event.target.closest
+                  ? event.target.closest('[data-mobile-nav="nearby"], .top-city-card, .category-home-card, .home-subcategory-card, .home-subcat-chip, .home-food-card')
+                  : null;
+                if (!target) {
+                  return;
+                }
+
+                var href = target.getAttribute('href') || '';
+                var isNearbyTrigger = target.getAttribute('data-mobile-nav') === 'nearby';
+                var shouldBypass = isNearbyTrigger || target.matches('.home-subcategory-card, .home-subcat-chip, .home-food-card');
+                if (!shouldBypass && !isDiscoveryHref(href)) {
+                  return;
+                }
+
+                if (target.hasAttribute('data-home-subcategory-trigger') && !isNearbyTrigger) {
+                  return;
+                }
+
+                var nextHref = stripNearbyUrl(href || window.location.pathname);
+                if (!nextHref) {
+                  return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+                if (window.ARAMABUL_HIDE_NAV_TOAST) {
+                  try { window.ARAMABUL_HIDE_NAV_TOAST(); } catch (error) {}
+                }
+                window.location.assign(nextHref);
+              }
+
+              window.addEventListener('click', handleClick, true);
+
+              try {
+                var currentUrl = new URL(window.location.href);
+                if (currentUrl.searchParams.get('nearby') === '1') {
+                  currentUrl.searchParams.delete('nearby');
+                  currentUrl.searchParams.delete('neighborhood');
+                  window.history.replaceState({}, '', currentUrl.pathname + currentUrl.search + currentUrl.hash);
+                }
+              } catch (error) {}
+            })();
+          } catch(e) {}
+          try {
+            (function installDirectCategoryNavigation() {
+              if (window.__ARAMABUL_DIRECT_CATEGORY_NAV_BOUND__) {
+                return;
+              }
+              window.__ARAMABUL_DIRECT_CATEGORY_NAV_BOUND__ = true;
+              document.addEventListener('click', function (event) {
+                var target = event.target && event.target.closest
+                  ? event.target.closest('.home-subcategory-card, .home-subcat-chip, .home-food-card')
+                  : null;
+                if (!target) {
+                  return;
+                }
+                if (target.getAttribute('data-mobile-nav') === 'nearby') {
+                  return;
+                }
+                var href = target.getAttribute('href') || '';
+                if (!href) {
+                  return;
+                }
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                window.location.assign(href);
+              }, true);
+            })();
+          } catch(e) {}
+          try {
+            (function installLocationFailsafe() {
+              function wrapLocationDetector() {
+                if (typeof window.ARAMABUL_GET_OR_DETECT_LOCATION !== 'function') {
+                  return;
+                }
+                if (window.ARAMABUL_GET_OR_DETECT_LOCATION.__appFailsafe) {
+                  return;
+                }
+                var originalDetector = window.ARAMABUL_GET_OR_DETECT_LOCATION;
+                var wrappedDetector = function () {
+                  return Promise.race([
+                    Promise.resolve().then(function () {
+                      return originalDetector.apply(window, arguments);
+                    }),
+                    new Promise(function (resolve) {
+                      window.setTimeout(function () { resolve(null); }, 15000);
+                    })
+                  ]);
+                };
+                wrappedDetector.__appFailsafe = true;
+                window.ARAMABUL_GET_OR_DETECT_LOCATION = wrappedDetector;
+              }
+              wrapLocationDetector();
+              window.setTimeout(wrapLocationDetector, 250);
+              window.setTimeout(wrapLocationDetector, 1000);
+              window.setTimeout(wrapLocationDetector, 2500);
+              window.setTimeout(wrapLocationDetector, 5000);
+              document.addEventListener('DOMContentLoaded', wrapLocationDetector);
+              window.addEventListener('load', wrapLocationDetector);
+              document.addEventListener('aramabul:appready', wrapLocationDetector);
+            })();
+          } catch(e) {}
           try {
             document.dispatchEvent(new CustomEvent('aramabul:appready'));
           } catch(e) {}
@@ -724,6 +957,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
 
   @override
   void dispose() {
+    _loadingWatchdog?.cancel();
     _connectivitySub.cancel();
     super.dispose();
   }
