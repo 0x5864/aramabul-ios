@@ -22,8 +22,8 @@ final String kLiveUrl = kDebugMode ? 'http://127.0.0.1:8787' : 'https://aramabul
 const String kDeepLinkHost = 'aramabul.com';
 const String kDeepLinkHostWww = 'www.aramabul.com';
 
-const String kAppVersion = '1.2.2';
-const String kAppBuildNumber = '52';
+const String kAppVersion = '1.2.3';
+const String kAppBuildNumber = '53';
 const String kAppWebCacheVersion = '20260621-mobile-location-failsafe-v2';
 
 const Color kAppBackgroundColor = Colors.white;
