@@ -331,6 +331,10 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
   Future<NavigationDecision> _onNavigationRequest(
     NavigationRequest request,
   ) async {
+    if (!request.isMainFrame) {
+      debugPrint('[HomeWebView] subframe navigation allowed: ${request.url}');
+      return NavigationDecision.navigate;
+    }
     final rawUrl = request.url.trim();
     debugPrint('[HomeWebView] navigation request: $rawUrl');
     final parsed = Uri.tryParse(rawUrl);
