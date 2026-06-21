@@ -17,6 +17,7 @@ ARCHIVE_PATH="build/ios/archive/Runner.xcarchive"
 ARCHIVE_APP="$ARCHIVE_PATH/Products/Applications/Runner.app"
 EXPORT_PATH="build/ios/ipa_appstore_clean"
 IPA_PATH="$EXPORT_PATH/aramabul.ipa"
+DEFAULT_IPA_PATH="build/ios/ipa/aramabul.ipa"
 FINAL_IPA="aramabul-${BUILD_NAME}-build${BUILD_NUMBER}-appstore.ipa"
 CHECK_DIR="$(mktemp -d)"
 
@@ -59,5 +60,7 @@ if [[ "$simulator_hits" -ne 0 ]]; then
   exit 1
 fi
 
+cp "$IPA_PATH" "$DEFAULT_IPA_PATH"
 cp "$IPA_PATH" "$FINAL_IPA"
+echo "Replaced $ROOT_DIR/$DEFAULT_IPA_PATH with the clean App Store IPA"
 echo "Created $ROOT_DIR/$FINAL_IPA"
