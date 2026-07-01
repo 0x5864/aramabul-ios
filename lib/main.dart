@@ -18,13 +18,15 @@ import 'package:share_plus/share_plus.dart';
 // Configuration
 // ---------------------------------------------------------------------------
 
-final String kLiveUrl = kDebugMode ? 'http://127.0.0.1:8787' : 'https://aramabul.com';
+final String kLiveUrl = kDebugMode
+    ? 'http://127.0.0.1:8787'
+    : 'https://aramabul.com';
 const String kDeepLinkHost = 'aramabul.com';
 const String kDeepLinkHostWww = 'www.aramabul.com';
 
-const String kAppVersion = '1.2.3';
-const String kAppBuildNumber = '55';
-const String kAppWebCacheVersion = '20260621-mobile-location-failsafe-v2';
+const String kAppVersion = '1.2.4';
+const String kAppBuildNumber = '56';
+const String kAppWebCacheVersion = '20260701-ios-native-nav-v1';
 
 const Color kAppBackgroundColor = Colors.white;
 const Color kAppProgressColor = Color(0xFFE30A17);
@@ -81,8 +83,11 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
   bool _isOffline = false;
   bool _googleInitialized = false;
   Timer? _loadingWatchdog;
+  Timer? _nearbyLocationFallback;
   int _lastLoggedProgressBucket = -1;
   DateTime? _suppressExternalMapsUntil;
+  String _currentPath = '/';
+  bool _showNativeFavorites = false;
 
   @override
   void initState() {
@@ -96,17 +101,22 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
     );
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 AramaBulIOS')
+      ..setUserAgent(
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 AramaBulIOS',
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: _onNavigationRequest,
           onPageStarted: (url) {
             debugPrint('[HomeWebView] page started: $url');
+            final nextPath = _pathFromUrl(url);
             if (!mounted) return;
             setState(() {
               _isLoading = true;
               _lastError = null;
               _isPageTransitioning = true;
+              _currentPath = nextPath;
+              _showNativeFavorites = false;
             });
             _startLoadingWatchdog('page started');
           },
@@ -114,8 +124,13 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
             if (!mounted) return;
             _loadingWatchdog?.cancel();
             _injectAppBridge();
+            _injectAppVisualOverrides();
             _controller.currentUrl().then((currentUrl) {
               debugPrint('[HomeWebView] page finished: $currentUrl');
+              final nextPath = _pathFromUrl(currentUrl);
+              if (mounted) {
+                setState(() => _currentPath = nextPath);
+              }
             });
             Future.delayed(const Duration(milliseconds: 150), () {
               if (!mounted) return;
@@ -219,15 +234,20 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
 
   Future<void> _loadLivePage([String? path]) async {
     if (!mounted) return;
-    debugPrint('[HomeWebView] load live page path: ${path ?? widget.initialPath ?? '/'}');
+    debugPrint(
+      '[HomeWebView] load live page path: ${path ?? widget.initialPath ?? '/'}',
+    );
     setState(() {
       _isLoading = true;
       _isPageTransitioning = true;
       _lastError = null;
       _isOffline = false;
+      _showNativeFavorites = false;
     });
     final requestedPath = path ?? widget.initialPath ?? '';
-    final rawUrl = requestedPath.isNotEmpty ? '$kLiveUrl$requestedPath' : kLiveUrl;
+    final rawUrl = requestedPath.isNotEmpty
+        ? '$kLiveUrl$requestedPath'
+        : kLiveUrl;
     final uri = Uri.parse(rawUrl);
     final url = uri.replace(
       queryParameters: {
@@ -237,6 +257,116 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
     );
     _startLoadingWatchdog('load live page');
     await _controller.loadRequest(url);
+  }
+
+  String _pathFromUrl(String? rawUrl) {
+    final uri = Uri.tryParse(rawUrl ?? '');
+    final path = uri?.path.trim();
+    if (path == null || path.isEmpty || path == '/') return '/';
+    return path;
+  }
+
+  int _selectedNativeNavIndex() {
+    if (_showNativeFavorites) return 2;
+    if (_currentPath.endsWith('/favorites.html')) return 2;
+    if (_currentPath.endsWith('/profile.html') ||
+        _currentPath.contains('-settings.html')) {
+      return 3;
+    }
+    if (_currentPath.endsWith('/yeme-icme.html')) {
+      return 1;
+    }
+    return 0;
+  }
+
+  Future<void> _openNativeNavIndex(int index) async {
+    switch (index) {
+      case 0:
+        _nearbyLocationFallback?.cancel();
+        setState(() => _showNativeFavorites = false);
+        await _loadLivePage('/');
+        break;
+      case 1:
+        await _openNearbyNeighborhoodPage();
+        break;
+      case 2:
+        _nearbyLocationFallback?.cancel();
+        await _loadLivePage('/favorites.html');
+        break;
+      case 3:
+        _nearbyLocationFallback?.cancel();
+        setState(() => _showNativeFavorites = false);
+        await _loadLivePage('/profile.html?action=profile');
+        break;
+    }
+  }
+
+  Future<void> _openNearbyNeighborhoodPage() async {
+    _nearbyLocationFallback?.cancel();
+    setState(() => _showNativeFavorites = false);
+
+    _nearbyLocationFallback = Timer(const Duration(seconds: 7), () {
+      if (!mounted) return;
+      debugPrint(
+        '[HomeWebView] nearby location fallback opened generic nearby',
+      );
+      unawaited(_loadLivePage('/yeme-icme.html?nearby=1&limit=200'));
+    });
+
+    try {
+      await _controller.runJavaScript('''
+        (function() {
+          var bridge = window.AramaBulIOS || window.AramaBulAndroid;
+          function send(payload) {
+            try {
+              bridge.postMessage(JSON.stringify(Object.assign({
+                action: 'openNearbyNeighborhood'
+              }, payload || {})));
+            } catch (error) {}
+          }
+          if (!bridge || !bridge.postMessage || typeof window.ARAMABUL_GET_OR_DETECT_LOCATION !== 'function') {
+            send({});
+            return;
+          }
+          Promise.race([
+            Promise.resolve().then(function() {
+              return window.ARAMABUL_GET_OR_DETECT_LOCATION();
+            }),
+            new Promise(function(resolve) {
+              setTimeout(function() { resolve(null); }, 6000);
+            })
+          ]).then(function(location) {
+            send(location || {});
+          }).catch(function() {
+            send({});
+          });
+        })();
+      ''');
+    } catch (error) {
+      debugPrint('[HomeWebView] nearby bridge failed: $error');
+      _nearbyLocationFallback?.cancel();
+      await _loadLivePage('/yeme-icme.html?nearby=1&limit=200');
+    }
+  }
+
+  Future<void> _openNearbyNeighborhoodFromPayload(
+    Map<String, dynamic> data,
+  ) async {
+    _nearbyLocationFallback?.cancel();
+    final district = (data['district'] as String? ?? '').trim();
+    final neighborhood = (data['neighborhood'] as String? ?? '').trim();
+
+    if (district.isEmpty) {
+      await _loadLivePage('/yeme-icme.html?nearby=1&limit=200');
+      return;
+    }
+
+    final query = <String, String>{'district': district, 'limit': '200'};
+    if (neighborhood.isNotEmpty) {
+      query['neighborhood'] = neighborhood;
+    }
+    final uri = Uri(path: '/yeme-icme.html', queryParameters: query);
+    await _loadLivePage(uri.toString());
   }
 
   void _startLoadingWatchdog(String reason) {
@@ -364,7 +494,9 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
     if (_isMapLikeUrl(parsed, rawUrl) &&
         _suppressExternalMapsUntil != null &&
         DateTime.now().isBefore(_suppressExternalMapsUntil!)) {
-      debugPrint('[HomeWebView] navigation decision: suppress external map $rawUrl');
+      debugPrint(
+        '[HomeWebView] navigation decision: suppress external map $rawUrl',
+      );
       return NavigationDecision.prevent;
     }
 
@@ -466,6 +598,12 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
             await prefs.setString('auth_user_email', loginEmail);
           });
           break;
+        case 'openFavorites':
+          _loadLivePage('/favorites.html');
+          break;
+        case 'openNearbyNeighborhood':
+          unawaited(_openNearbyNeighborhoodFromPayload(data));
+          break;
         case 'logout':
         case 'accountDeleted':
           _resetSession();
@@ -480,9 +618,23 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_user_name');
     await prefs.remove('auth_user_email');
+    await prefs.remove('aramabul.auth.session.v1');
     try {
       await GoogleSignIn.instance.signOut();
     } catch (_) {}
+    try {
+      await _controller.runJavaScript('''
+        try { localStorage.removeItem('aramabul.auth.session.v1'); } catch(e) {}
+        try { localStorage.removeItem('auth_user_name'); } catch(e) {}
+        try { localStorage.removeItem('auth_user_email'); } catch(e) {}
+        try { sessionStorage.removeItem('aramabul.auth.session.v1'); } catch(e) {}
+        try { sessionStorage.removeItem('auth_user_name'); } catch(e) {}
+        try { sessionStorage.removeItem('auth_user_email'); } catch(e) {}
+        try { document.dispatchEvent(new CustomEvent('aramabul:authchange')); } catch(e) {}
+      ''');
+    } catch (error) {
+      debugPrint('[AuthSync] Web session reset skipped: $error');
+    }
     await WebViewCookieManager().clearCookies();
     if (!mounted) return;
     await _loadLivePage('/');
@@ -512,6 +664,9 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
         }),
       );
       final response = await request.close();
+      await _syncSetCookieHeadersToWebView(
+        response.headers[HttpHeaders.setCookieHeader],
+      );
       final body = await response.transform(utf8.decoder).join();
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw HttpException('Social login failed: ${response.statusCode}');
@@ -525,6 +680,31 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
       };
     } finally {
       client.close();
+    }
+  }
+
+  Future<void> _syncSetCookieHeadersToWebView(
+    List<String>? setCookieHeaders,
+  ) async {
+    if (setCookieHeaders == null || setCookieHeaders.isEmpty) return;
+
+    final cookieManager = WebViewCookieManager();
+    for (final header in setCookieHeaders) {
+      try {
+        final cookie = Cookie.fromSetCookieValue(header);
+        if (cookie.name.isEmpty || cookie.value.isEmpty) continue;
+
+        await cookieManager.setCookie(
+          WebViewCookie(
+            name: cookie.name,
+            value: cookie.value,
+            domain: 'aramabul.com',
+            path: cookie.path?.isNotEmpty == true ? cookie.path! : '/',
+          ),
+        );
+      } catch (error) {
+        debugPrint('[AuthSync] Cookie sync failed: $error');
+      }
     }
   }
 
@@ -542,9 +722,13 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
     await _controller.runJavaScript('''
       try { localStorage.setItem('aramabul.auth.session.v1', $sessionLiteral); } catch(e) {}
       try { document.dispatchEvent(new CustomEvent('aramabul:authchange')); } catch(e) {}
-      var nextUrl = new URL(window.location.href);
-      nextUrl.searchParams.set('t', Date.now().toString());
-      window.location.href = nextUrl.toString();
+      try {
+        var nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set('appAuthRefresh', Date.now().toString());
+        window.location.replace(nextUrl.pathname + nextUrl.search + nextUrl.hash);
+      } catch (error) {
+        window.location.href = window.location.href.split('#')[0] + '?appAuthRefresh=' + Date.now();
+      }
     ''');
   }
 
@@ -701,6 +885,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
       });
       final usersLiteral = jsonEncode(nativeUsersRaw);
       final sessionLiteral = jsonEncode(authSessionJson);
+      final webCacheLiteral = jsonEncode(kAppWebCacheVersion);
 
       await _controller.runJavaScript('''
         try {
@@ -758,23 +943,119 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
             })();
           } catch(e) {}
           try {
+            (function removeWebBottomNavForIOS() {
+              function removeNav() {
+                try {
+                  document.querySelectorAll('.mobile-bottom-nav').forEach(function (node) {
+                    node.remove();
+                  });
+                  if (document.body) {
+                    document.body.classList.remove('mobile-bottom-nav-visible');
+                    document.body.style.paddingBottom = '0px';
+                  }
+                } catch (error) {}
+              }
+              removeNav();
+              window.setTimeout(removeNav, 100);
+              window.setTimeout(removeNav, 350);
+              window.setTimeout(removeNav, 1000);
+              window.setTimeout(removeNav, 2500);
+              try {
+                new MutationObserver(removeNav).observe(document.documentElement, {
+                  childList: true,
+                  subtree: true
+                });
+              } catch (error) {}
+            })();
+          } catch(e) {}
+          try {
+            (function installIOSDirectAppNav() {
+              if (window.__ARAMABUL_IOS_DIRECT_APP_NAV__) {
+                return;
+              }
+              window.__ARAMABUL_IOS_DIRECT_APP_NAV__ = true;
+
+              function postOpenFavorites() {
+                try {
+                  var bridge = window.AramaBulIOS || window.AramaBulAndroid;
+                  if (bridge && bridge.postMessage) {
+                    bridge.postMessage(JSON.stringify({ action: 'openFavorites' }));
+                    return true;
+                  }
+                } catch (error) {
+                  return false;
+                }
+                return false;
+              }
+
+              function handleDirectNav(event) {
+                var target = event.target && event.target.closest
+                  ? event.target.closest('[data-mobile-nav="favorites"], a[href="favorites.html"], a[href="/favorites.html"]')
+                  : null;
+                if (!target) {
+                  return;
+                }
+                event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+                if (window.ARAMABUL_HIDE_NAV_TOAST) {
+                  try { window.ARAMABUL_HIDE_NAV_TOAST(); } catch (error) {}
+                }
+                if (!postOpenFavorites()) {
+                  window.location.assign('/favorites.html?appCache=' + encodeURIComponent($webCacheLiteral));
+                }
+              }
+
+              function bindExistingButtons() {
+                document.querySelectorAll('[data-mobile-nav="favorites"], a[href="favorites.html"], a[href="/favorites.html"]').forEach(function (target) {
+                  if (target.__aramabulIOSFavoritesBound) {
+                    return;
+                  }
+                  target.__aramabulIOSFavoritesBound = true;
+                  target.addEventListener('click', handleDirectNav, true);
+                });
+              }
+
+              window.addEventListener('pointerdown', handleDirectNav, true);
+              window.addEventListener('touchstart', handleDirectNav, true);
+              window.addEventListener('click', handleDirectNav, true);
+              document.addEventListener('click', handleDirectNav, true);
+              bindExistingButtons();
+              window.setTimeout(bindExistingButtons, 250);
+              window.setTimeout(bindExistingButtons, 1000);
+              window.setTimeout(bindExistingButtons, 2500);
+              try {
+                new MutationObserver(bindExistingButtons).observe(document.documentElement, {
+                  childList: true,
+                  subtree: true
+                });
+              } catch (error) {}
+            })();
+          } catch(e) {}
+          try {
             (function installAppLocationNavigationBypass() {
               if (window.__ARAMABUL_APP_LOCATION_NAV_BYPASS__) {
                 return;
               }
               window.__ARAMABUL_APP_LOCATION_NAV_BYPASS__ = true;
 
-              function stripNearbyUrl(rawHref) {
+              function stripNearbyUrl(rawHref, options) {
                 var href = String(rawHref || '').trim();
                 if (!href) {
                   return '';
                 }
+                var preserveNearby = Boolean(options && options.preserveNearby);
                 try {
                   var url = new URL(href, window.location.href);
-                  url.searchParams.delete('nearby');
-                  url.searchParams.delete('neighborhood');
+                  if (!preserveNearby) {
+                    url.searchParams.delete('nearby');
+                    url.searchParams.delete('neighborhood');
+                  }
                   return url.pathname + url.search + url.hash;
                 } catch (error) {
+                  if (preserveNearby) {
+                    return href;
+                  }
                   return href
                     .replace(/[?&]nearby=1\b/g, '')
                     .replace(/[?&]neighborhood=[^&]*/g, '');
@@ -809,7 +1090,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
                   return;
                 }
 
-                var nextHref = stripNearbyUrl(href || window.location.pathname);
+                var nextHref = stripNearbyUrl(isNearbyTrigger ? 'yeme-icme.html?nearby=1' : (href || window.location.pathname), { preserveNearby: isNearbyTrigger });
                 if (!nextHref) {
                   return;
                 }
@@ -828,9 +1109,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
               try {
                 var currentUrl = new URL(window.location.href);
                 if (currentUrl.searchParams.get('nearby') === '1') {
-                  currentUrl.searchParams.delete('nearby');
-                  currentUrl.searchParams.delete('neighborhood');
-                  window.history.replaceState({}, '', currentUrl.pathname + currentUrl.search + currentUrl.hash);
+                  window.__ARAMABUL_APP_NEARBY_ACTIVE__ = true;
                 }
               } catch (error) {}
             })();
@@ -877,7 +1156,7 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
                       return originalDetector.apply(window, arguments);
                     }),
                     new Promise(function (resolve) {
-                      window.setTimeout(function () { resolve(null); }, 15000);
+                      window.setTimeout(function () { resolve(null); }, 3000);
                     })
                   ]);
                 };
@@ -920,6 +1199,144 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
     }
   }
 
+  Future<void> _injectAppVisualOverrides() async {
+    try {
+      await _controller.runJavaScript(r'''
+        (function () {
+          var styleId = 'aramabul-ios-visual-overrides';
+          var style = document.getElementById(styleId);
+          if (!style) {
+            style = document.createElement('style');
+            style.id = styleId;
+            document.head.appendChild(style);
+          }
+
+          style.textContent = `
+            .mobile-bottom-nav {
+              display: none !important;
+              visibility: hidden !important;
+              opacity: 0 !important;
+              pointer-events: none !important;
+            }
+
+            body.mobile-bottom-nav-visible {
+              padding-bottom: 0 !important;
+            }
+
+            .favorites-page-shell {
+              width: min(1220px, calc(100% - 4.8rem)) !important;
+            }
+
+            .favorites-page-shell .favorites-page-title {
+              font-size: clamp(1.2rem, 1.8vw, 1.8rem) !important;
+              font-weight: 650 !important;
+              line-height: 1 !important;
+              letter-spacing: 0 !important;
+            }
+
+            .favorites-page-shell .favorites-grid .istanbul-venue-card {
+              border: 1px solid #c9ced4 !important;
+              border-radius: 8px !important;
+            }
+
+            @media (max-width: 699px) {
+              body.profile-page.settings-page,
+              body.profile-page.settings-page .settings-shell,
+              body.profile-page.settings-page .settings-layout,
+              body.profile-page.settings-page .settings-sidebar-card {
+                background: #ffffff !important;
+              }
+
+              body.profile-page.settings-page .settings-sidebar-card {
+                border: 1px solid #ffffff !important;
+                box-shadow: none !important;
+              }
+
+              body.profile-page.settings-page
+                .settings-sidebar-card
+                .settings-row {
+                min-height: 48px !important;
+              }
+
+              body.profile-page.settings-page
+                .settings-sidebar-card
+                .settings-row-chevron {
+                flex-basis: 28px !important;
+                width: 28px !important;
+                height: 28px !important;
+              }
+
+              body.profile-page.settings-page
+                .settings-sidebar-card
+                .settings-row-chevron
+                svg {
+                width: 15px !important;
+                height: 15px !important;
+              }
+            }
+          `;
+
+          function dedupeCorporateProfileRows() {
+            var sidebar = document.querySelector('.settings-sidebar-card');
+            if (!sidebar) {
+              return;
+            }
+
+            var selectorRows = Array.from(sidebar.querySelectorAll([
+              '[data-settings-panel-trigger="corporate"]',
+              'a[href="kurumsal-settings.html"]',
+              'a[href*="action=corporate"]'
+            ].join(',')));
+            var labelRows = Array.from(sidebar.querySelectorAll('.settings-row')).filter(function (row) {
+              var label = row.querySelector('.settings-row-label');
+              return label && label.textContent && label.textContent.trim().toLocaleLowerCase('tr') === 'kurumsal';
+            });
+            var corporateRows = Array.from(new Set(selectorRows.concat(labelRows)));
+
+            if (corporateRows.length < 2) {
+              return;
+            }
+
+            var preferred = corporateRows.find(function (row) {
+              return row.getAttribute('data-settings-panel-trigger') === 'corporate';
+            }) || corporateRows.find(function (row) {
+              return (row.getAttribute('href') || '').indexOf('action=corporate') !== -1;
+            }) || corporateRows[0];
+
+            corporateRows.forEach(function (row) {
+              if (row !== preferred) {
+                row.remove();
+              }
+            });
+          }
+
+          function installCorporateProfileDedupe() {
+            dedupeCorporateProfileRows();
+            window.setTimeout(dedupeCorporateProfileRows, 100);
+            window.setTimeout(dedupeCorporateProfileRows, 350);
+            window.setTimeout(dedupeCorporateProfileRows, 1000);
+            window.setTimeout(dedupeCorporateProfileRows, 2500);
+            if (window.__ARAMABUL_IOS_CORPORATE_DEDUPE__) {
+              return;
+            }
+            window.__ARAMABUL_IOS_CORPORATE_DEDUPE__ = true;
+            try {
+              new MutationObserver(dedupeCorporateProfileRows).observe(document.documentElement, {
+                childList: true,
+                subtree: true
+              });
+            } catch (error) {}
+          }
+
+          installCorporateProfileDedupe();
+          window.setTimeout(installCorporateProfileDedupe, 350);
+        })();
+      ''');
+    } catch (error) {
+      debugPrint('[HomeWebView] Visual override injection failed: $error');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final showProgress = _isLoading && _progress < 100;
@@ -949,14 +1366,29 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
             Expanded(
               child: Stack(
                 children: [
-                  if (_hasLoadedAtLeastOnce && !_isOffline)
+                  if (_showNativeFavorites)
+                    NativeFavoritesView(
+                      onOpenVenue: (venue) {
+                        final domainKey =
+                            (venue['domainKey'] as String? ?? 'yeme-icme')
+                                .trim();
+                        final slug = (venue['slug'] as String? ?? '').trim();
+                        final path = slug.isEmpty
+                            ? '/${domainKey.isEmpty ? 'yeme-icme' : domainKey}.html'
+                            : '/${domainKey.isEmpty ? 'yeme-icme' : domainKey}.html?venue=${Uri.encodeQueryComponent(slug)}';
+                        setState(() => _showNativeFavorites = false);
+                        unawaited(_loadLivePage(path));
+                      },
+                    )
+                  else if (_hasLoadedAtLeastOnce && !_isOffline)
                     WebViewWidget(controller: _controller),
                   if (_isOffline)
                     OfflineView(
                       details: kDebugMode ? _lastError : null,
                       onRetry: _reload,
                     ),
-                  if (!_isOffline &&
+                  if (!_showNativeFavorites &&
+                      !_isOffline &&
                       (_isPageTransitioning || !_hasLoadedAtLeastOnce))
                     Positioned.fill(
                       child: Container(
@@ -973,6 +1405,38 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
             ),
           ],
         ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _selectedNativeNavIndex(),
+          backgroundColor: Colors.white,
+          indicatorColor: const Color(0xFFE8F1F8),
+          surfaceTintColor: Colors.white,
+          height: 64,
+          onDestinationSelected: (index) {
+            unawaited(_openNativeNavIndex(index));
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Ana',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.my_location_outlined),
+              selectedIcon: Icon(Icons.my_location),
+              label: 'Yakın',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.favorite_border),
+              selectedIcon: Icon(Icons.favorite),
+              label: 'Favori',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Hesap',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -980,8 +1444,271 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
   @override
   void dispose() {
     _loadingWatchdog?.cancel();
+    _nearbyLocationFallback?.cancel();
     _connectivitySub.cancel();
     super.dispose();
+  }
+}
+
+class NativeFavoritesView extends StatefulWidget {
+  final ValueChanged<Map<String, dynamic>> onOpenVenue;
+
+  const NativeFavoritesView({super.key, required this.onOpenVenue});
+
+  @override
+  State<NativeFavoritesView> createState() => _NativeFavoritesViewState();
+}
+
+class _NativeFavoritesViewState extends State<NativeFavoritesView> {
+  late Future<List<Map<String, dynamic>>> _favoritesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _favoritesFuture = _loadFavorites();
+  }
+
+  Future<List<Map<String, dynamic>>> _loadFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = (prefs.getString('auth_user_email') ?? '').trim();
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(
+        Uri.parse('$kLiveUrl/api/mvp/favorites'),
+      );
+      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      if (email.isNotEmpty) {
+        request.headers.set('X-Aramabul-Auth-Email', email);
+      }
+      final response = await request.close().timeout(
+        const Duration(seconds: 8),
+      );
+      final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw HttpException('Favoriler yüklenemedi: ${response.statusCode}');
+      }
+      final payload = jsonDecode(body) as Map<String, dynamic>;
+      final items = payload['items'];
+      if (items is! List) return const [];
+      return items
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() {
+      _favoritesFuture = _loadFavorites();
+    });
+    await _favoritesFuture;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.white,
+      child: SafeArea(
+        top: false,
+        child: RefreshIndicator(
+          onRefresh: _refresh,
+          color: kAppProgressColor,
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _favoritesFuture,
+            builder: (context, snapshot) {
+              final items = snapshot.data ?? const <Map<String, dynamic>>[];
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                children: [
+                  const Text(
+                    'Favorilerim',
+                    style: TextStyle(
+                      color: Color(0xFF011E3A),
+                      fontSize: 26,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    snapshot.connectionState == ConnectionState.waiting
+                        ? 'Favoriler getiriliyor.'
+                        : '${items.length} mekan kayıtlı',
+                    style: const TextStyle(
+                      color: Color(0xFF627284),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 80),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: kAppProgressColor,
+                        ),
+                      ),
+                    )
+                  else if (snapshot.hasError)
+                    _NativeFavoritesMessage(
+                      title: 'Favoriler yüklenemedi',
+                      message: '${snapshot.error}',
+                    )
+                  else if (items.isEmpty)
+                    const _NativeFavoritesMessage(
+                      title: 'Henüz kayıtlı mekanın yok',
+                      message:
+                          'Yeme-İçme ekranından mekan kaydetmeye başlayabilirsin.',
+                    )
+                  else
+                    ...items.map(
+                      (venue) => _NativeFavoriteCard(
+                        venue: venue,
+                        onTap: () => widget.onOpenVenue(venue),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NativeFavoritesMessage extends StatelessWidget {
+  final String title;
+  final String message;
+
+  const _NativeFavoritesMessage({required this.title, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 48),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE1E8EF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF011E3A),
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: const TextStyle(
+              color: Color(0xFF627284),
+              fontSize: 14,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NativeFavoriteCard extends StatelessWidget {
+  final Map<String, dynamic> venue;
+  final VoidCallback onTap;
+
+  const _NativeFavoriteCard({required this.venue, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (venue['name'] as String? ?? 'İsimsiz mekan').trim();
+    final district = (venue['district'] as String? ?? '').trim();
+    final neighborhood = (venue['neighborhood'] as String? ?? '').trim();
+    final address = (venue['address'] as String? ?? 'Adres bilgisi bulunmuyor.')
+        .trim();
+    final rating = venue['rating'];
+    final ratingText = rating == null
+        ? ''
+        : rating.toString().replaceAll('.', ',');
+
+    return Card(
+      color: Colors.white,
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Color(0xFFE1E8EF)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF011E3A),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  if (ratingText.isNotEmpty)
+                    Text(
+                      ratingText,
+                      style: const TextStyle(
+                        color: Color(0xFF094174),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                [
+                  district,
+                  neighborhood,
+                ].where((part) => part.isNotEmpty).join(' / '),
+                style: const TextStyle(
+                  color: Color(0xFF627284),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                address,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF2D3A45),
+                  fontSize: 13,
+                  height: 1.35,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
