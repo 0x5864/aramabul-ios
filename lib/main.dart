@@ -23,9 +23,13 @@ final String kLiveUrl = kDebugMode
     : 'https://aramabul.com';
 const String kDeepLinkHost = 'aramabul.com';
 const String kDeepLinkHostWww = 'www.aramabul.com';
+const String kGoogleIosClientId =
+    '849707147159-r27vvc6qoqsu66r8gh6mkc2d56b4ls1u.apps.googleusercontent.com';
+const String kGoogleServerClientId =
+    '849707147159-94nfr5dv3ic23d3t80qfdvfhoq9gd4mv.apps.googleusercontent.com';
 
 const String kAppVersion = '1.2.4';
-const String kAppBuildNumber = '56';
+const String kAppBuildNumber = '57';
 const String kAppWebCacheVersion = '20260701-ios-native-nav-v1';
 
 const Color kAppBackgroundColor = Colors.white;
@@ -193,8 +197,8 @@ class _HomeWebViewPageState extends State<HomeWebViewPage> {
     if (_googleInitialized) return;
     try {
       await GoogleSignIn.instance.initialize(
-        serverClientId:
-            '849707147159-94nfr5dv3ic23d3t80qfdvfhoq9gd4mv.apps.googleusercontent.com',
+        clientId: kGoogleIosClientId,
+        serverClientId: kGoogleServerClientId,
       );
       _googleInitialized = true;
     } catch (error) {
