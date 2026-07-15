@@ -28,7 +28,7 @@ const String kGoogleIosClientId =
 const String kGoogleServerClientId =
     '849707147159-94nfr5dv3ic23d3t80qfdvfhoq9gd4mv.apps.googleusercontent.com';
 
-const String kAppVersion = '1.2.4';
+const String kAppVersion = '1.2.5';
 const String kAppBuildNumber = '57';
 const String kAppWebCacheVersion = '20260701-ios-native-nav-v1';
 
